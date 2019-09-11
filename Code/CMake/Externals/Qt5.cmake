@@ -39,7 +39,7 @@ if(SV_USE_${proj})
   endif()
 
   
-  if(SV_USE_QT_GUI)
+  
     message("Externals/Qt5.cmake Qt5_DIR initial value: ${Qt5_DIR}")
     # If using toplevel dir, foce Qt_DIR to be the SV_Qt_DIR set by the
     # simvascular_add_new_external macro
@@ -47,21 +47,39 @@ if(SV_USE_${proj})
       if(WIN32)
         if(SV_EXTERNALS_VERSION_NUMBER VERSION_EQUAL "2018.01")
            set(${proj}_DIR "${SV_${proj}_DIR}/msvc2013_64_opengl/lib/cmake/Qt5" CACHE PATH "Force ${proj} dir to externals" FORCE)
-        elseif(SV_EXTERNALS_VERSION_NUMBER VERSION_GREATER_EQUAL "2018.05")
+        elseif(SV_EXTERNALS_VERSION_NUMBER VERSION_EQUAL "2018.05")
            set(${proj}_DIR "${SV_${proj}_DIR}/${Qt5_VERSION}/msvc2015_64/lib/cmake/Qt5" CACHE PATH "Force ${proj} dir to externals" FORCE)
+	elseif(SV_EXTERNALS_VERSION_NUMBER VERSION_EQUAL "2019.02")
+           set(${proj}_DIR "${SV_${proj}_DIR}/${Qt5_VERSION}/msvc2015_64/lib/cmake/Qt5" CACHE PATH "Force ${proj} dir to externals" FORCE)
+	elseif(SV_EXTERNALS_VERSION_NUMBER VERSION_GREATER_EQUAL "2019.06")
+           set(${proj}_DIR "${SV_${proj}_DIR}/${Qt5_VERSION}/msvc2017_64/lib/cmake/Qt5" CACHE PATH "Force ${proj} dir to externals" FORCE)
 	else()
 	   message(FATAL_ERROR "Invalid SV_EXTERNALS_VERSION_NUMBER ${SV_EXTERNALS_VERSION_NUMBER}")
         endif()
       elseif(LINUX)
         if(SV_EXTERNALS_VERSION_NUMBER VERSION_EQUAL "2018.01")
           set(${proj}_DIR ${SV_${proj}_DIR}/lib/cmake/Qt5 CACHE PATH "Force ${proj} dir to externals" FORCE)
-        elseif(SV_EXTERNALS_VERSION_NUMBER VERSION_GREATER_EQUAL "2018.05")
+        elseif(SV_EXTERNALS_VERSION_NUMBER VERSION_EQUAL "2018.05")
+          set(${proj}_DIR ${SV_${proj}_DIR}/${Qt5_VERSION}/gcc_64/lib/cmake/Qt5 CACHE PATH "Force ${proj} dir to externals" FORCE)
+	elseif(SV_EXTERNALS_VERSION_NUMBER VERSION_EQUAL "2019.02")
+          set(${proj}_DIR ${SV_${proj}_DIR}/${Qt5_VERSION}/gcc_64/lib/cmake/Qt5 CACHE PATH "Force ${proj} dir to externals" FORCE)
+	elseif(SV_EXTERNALS_VERSION_NUMBER VERSION_GREATER_EQUAL "2019.06")
           set(${proj}_DIR ${SV_${proj}_DIR}/${Qt5_VERSION}/gcc_64/lib/cmake/Qt5 CACHE PATH "Force ${proj} dir to externals" FORCE)
         else()
 	   message(FATAL_ERROR "Invalid SV_EXTERNALS_VERSION_NUMBER ${SV_EXTERNALS_VERSION_NUMBER}")
         endif()
       elseif(APPLE)
-        set(${proj}_DIR ${SV_${proj}_DIR}/lib/cmake/Qt5 CACHE PATH "Force ${proj} dir to externals" FORCE)
+        if(SV_EXTERNALS_VERSION_NUMBER VERSION_EQUAL "2018.01")
+          set(${proj}_DIR ${SV_${proj}_DIR}/lib/cmake/Qt5 CACHE PATH "Force ${proj} dir to externals" FORCE)
+        elseif(SV_EXTERNALS_VERSION_NUMBER VERSION_EQUAL "2018.05")
+          set(${proj}_DIR ${SV_${proj}_DIR}/lib/cmake/Qt5 CACHE PATH "Force ${proj} dir to externals" FORCE)        
+	elseif(SV_EXTERNALS_VERSION_NUMBER VERSION_EQUAL "2019.02")
+          set(${proj}_DIR ${SV_${proj}_DIR}/${Qt5_VERSION}/clang_64/lib/cmake/Qt5 CACHE PATH "Force ${proj} dir to externals" FORCE)
+	elseif(SV_EXTERNALS_VERSION_NUMBER VERSION_GREATER_EQUAL "2019.06")
+          set(${proj}_DIR ${SV_${proj}_DIR}/${Qt5_VERSION}/clang_64/lib/cmake/Qt5 CACHE PATH "Force ${proj} dir to externals" FORCE)
+        else()
+	   message(FATAL_ERROR "Invalid SV_EXTERNALS_VERSION_NUMBER ${SV_EXTERNALS_VERSION_NUMBER}")
+        endif()
       else()
         message(FATAL_ERROR "Unknown Platform for Qt5.cmake script")
       endif()
@@ -72,7 +90,7 @@ if(SV_USE_${proj})
         get_filename_component(_win32_qt5_top_path "${${proj}_DIR}/../../../" ABSOLUTE)
         set(${proj}_DLL_PATH "${_win32_qt5_top_path}/bin" CACHE PATH "Force Qt DLL Path" FORCE)
       endif()
-    endif()
+    
     
     message("Externals/Qt5.cmake Qt5_DIR final value: ${Qt5_DIR}")
     
@@ -98,6 +116,12 @@ if(SV_USE_${proj})
         WebKit
         )
     elseif(${proj}_VERSION VERSION_EQUAL "5.6.3")
+      list(APPEND SV_${proj}_COMPONENTS
+        WebEngineCore
+        WebEngineWidgets
+        WebView
+        )
+    elseif(${proj}_VERSION VERSION_EQUAL "5.11.3")
       list(APPEND SV_${proj}_COMPONENTS
         WebEngineCore
         WebEngineWidgets

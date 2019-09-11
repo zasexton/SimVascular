@@ -199,6 +199,7 @@ endif
 ifeq ($(SV_USE_QT),1)
 	-echo "puts \"s+REPLACEME_QT_SO_PATH+$(QT_SO_PATH)+g\"" >> tclscript
 	-echo "puts \"s+REPLACEME_QT_PLUGIN_PATH+$(QT_PLUGIN_PATH)+g\"" >> tclscript
+	-echo "puts \"s+REPLACEME_QT_QPA_FONTDIR+$(QT_QPA_FONTDIR)+g\"" >> tclscript
 	-echo "puts \"s+REPLACEME_QT_WEBENGINE_PROC+$(QT_WEBENGINE_PROC)+g\"" >> tclscript
 endif
 ifeq ($(SV_USE_MITK),1)
@@ -255,7 +256,20 @@ mk_simvascular_options_h:
 	-echo "#define MITK_PATCH_VERSION $(MITK_PATCH_VERSION)" >> ../Code/Source/Include/Make/simvascular_options.h
 	-echo "#endif" >> ../Code/Source/Include/Make/simvascular_options.h
 
-common-pre-build: mksedscript mk_simvascular_options_h post-build 
+machine-learning-network:
+	if [[ ! -e ../Python/site-packages/sv_ml/results ]];  then \
+	  /bin/rm -Rf results; \
+	  /bin/rm -Rf ../Python/site-packages/sv_ml/results; \
+	  /bin/rm -f networks.tar; \
+	  wget http://simvascular.stanford.edu/downloads/public/machine_learning/networks.tar .; \
+	  tar xvf ./networks.tar; \
+	  /bin/mv results ../Python/site-packages/sv_ml/results; \
+	  /bin/rm -f networks.tar; \
+	fi
+
+#	-/bin/rm -f networks.tar
+
+common-pre-build: mksedscript mk_simvascular_options_h machine-learning-network post-build 
 	mkdir -p Bin
 	mkdir -p Lib
 	mkdir -p Bin/plugins
@@ -264,10 +278,14 @@ common-pre-build: mksedscript mk_simvascular_options_h post-build
 	touch ../Code/Source/Include/Make/delaunay_options.h
 
 shared-pre-build: common-pre-build
+ifeq ($(SV_USE_MITK),1)
+ifeq ($(SV_USE_SV4_GUI),1)
 	cd ../Code/Source/sv4gui/Plugins;$(MAKE) create_plugin_export_h create_manifest_qrc create_cached_qrc
 	cd ../Code/Source/sv4gui/Plugins;$(MAKE) moc qrc ui
+endif
 	cd ../Code/Source/sv4gui/Modules;$(MAKE) moc qrc ui
 	cd ../Code/Source/sv4gui/Modules;$(MAKE) create_exports_h us-init-module create_cppmicroservices_file
+endif
 	cd ../Code/Source/vtkSV;$(MAKE) create_exports_outname_h
 	for i in ${SHARED_LIBDIRS}; do ( \
 	  echo "creating exports for shared directory ($$i)"; \
@@ -277,10 +295,14 @@ shared-pre-build: common-pre-build
 
 static-pre-build: common-pre-build
 	cd ../Code/Source/Application;$(MAKE) SV_STATIC_BUILD=1 pre
+ifeq ($(SV_USE_MITK),1)
+ifeq ($(SV_USE_SV4_GUI),1)
 	cd ../Code/Source/sv4gui/Plugins;$(MAKE) create_plugin_export_h create_manifest_qrc create_cached_qrc
 	cd ../Code/Source/sv4gui/Plugins;$(MAKE) moc qrc ui
 	cd ../Code/Source/sv4gui/Modules;$(MAKE) moc qrc ui
 	cd ../Code/Source/sv4gui/Modules;$(MAKE) create_exports_h us-init-module
+endif
+endif
 	cd ../Code/Source/vtkSV;$(MAKE) create_exports_outname_h
 
 shared-build:
@@ -389,3 +411,4 @@ clean:
 
 veryclean:  clean
 	if [ -e ext ];then /bin/rm -Rf ext;fi
+	if [ -e ../Python/site-packages/sv_ml/results ];then /bin/rm -Rf ../Python/site-packages/sv_ml/results;fi

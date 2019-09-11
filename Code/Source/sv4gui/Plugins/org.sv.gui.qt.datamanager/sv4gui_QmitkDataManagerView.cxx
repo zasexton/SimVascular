@@ -187,16 +187,21 @@ void sv4guiQmitkDataManagerView::CreateQtPartControl(QWidget* parent)
   // m_ItemDelegate = new sv4guiQmitkDataManagerItemDelegate(m_NodeTreeView);
   // m_NodeTreeView->setItemDelegate(m_ItemDelegate);
 
-  QObject::connect( m_NodeTreeView, SIGNAL(customContextMenuRequested(const QPoint&))
-    , this, SLOT(NodeTableViewContextMenuRequested(const QPoint&)) );
-  QObject::connect( m_NodeTreeModel, SIGNAL(rowsInserted (const QModelIndex&, int, int))
-    , this, SLOT(NodeTreeViewRowsInserted ( const QModelIndex&, int, int )) );
-  QObject::connect( m_NodeTreeModel, SIGNAL(rowsRemoved (const QModelIndex&, int, int))
-    , this, SLOT(NodeTreeViewRowsRemoved( const QModelIndex&, int, int )) );
-  QObject::connect( m_NodeTreeView->selectionModel()
-    , SIGNAL( selectionChanged ( const QItemSelection &, const QItemSelection & ) )
-    , this
-    , SLOT( NodeSelectionChanged ( const QItemSelection &, const QItemSelection & ) ) );
+  QObject::connect( m_NodeTreeView, SIGNAL(customContextMenuRequested(const QPoint&)), this, 
+    SLOT(NodeTableViewContextMenuRequested(const QPoint&)) );
+
+  QObject::connect( m_NodeTreeModel, SIGNAL(rowsInserted (const QModelIndex&, int, int)), this, 
+    SLOT(NodeTreeViewRowsInserted ( const QModelIndex&, int, int )) );
+
+  QObject::connect( m_NodeTreeModel, SIGNAL(rowsRemoved (const QModelIndex&, int, int)), this, 
+    SLOT(NodeTreeViewRowsRemoved( const QModelIndex&, int, int )) );
+
+  QObject::connect( m_NodeTreeView->selectionModel(), SIGNAL( selectionChanged ( const QItemSelection &, const QItemSelection & )), 
+    this, SLOT( NodeSelectionChanged ( const QItemSelection &, const QItemSelection & ) ) );
+
+  // Toggle Data Node visibility by selecting the Data Manager check box (in front of a Data Node). 
+  QObject::connect(m_NodeTreeModel, &QmitkDataStorageTreeModel::nodeVisibilityChanged, this, 
+    &sv4guiQmitkDataManagerView::OnNodeVisibilityChanged);
 
   //# m_NodeMenu
   m_NodeMenu = new QMenu(m_NodeTreeView);
@@ -249,11 +254,11 @@ void sv4guiQmitkDataManagerView::CreateQtPartControl(QWidget* parent)
   // unknownDataNodeDescriptor->AddAction(removeAction);
   // m_DescriptorActionList.push_back(std::pair<QmitkNodeDescriptor*, QAction*>(unknownDataNodeDescriptor,removeAction));
 
-  //QAction* reinitAction = new QAction(QIcon(":/org.sv.gui.qt.datamanager/Refresh_48.png"), "Reinit", this);
-  //QObject::connect( reinitAction, SIGNAL( triggered(bool) )
-  //  , this, SLOT( ReinitSelectedNodes(bool) ) );
-  //unknownDataNodeDescriptor->AddAction(reinitAction);
-  //m_DescriptorActionList.push_back(std::pair<QmitkNodeDescriptor*, QAction*>(unknownDataNodeDescriptor,reinitAction));
+  // Add 'Reinit' action to context menu.
+  QAction* nodeReinitAction = new QAction(QIcon(":/org.sv.gui.qt.datamanager/Refresh_48.png"), "Reinit", this);
+  QObject::connect(nodeReinitAction, SIGNAL( triggered(bool)) , this, SLOT( ReinitSelectedNodes(bool) ) );
+  unknownDataNodeDescriptor->AddAction(nodeReinitAction);
+  m_DescriptorActionList.push_back(std::pair<QmitkNodeDescriptor*, QAction*>(unknownDataNodeDescriptor,nodeReinitAction));
 
   // find contextMenuAction extension points and add them to the node descriptor
   berry::IExtensionRegistry* extensionPointService = berry::Platform::GetExtensionRegistry();
@@ -267,17 +272,12 @@ void sv4guiQmitkDataManagerView::CreateQtPartControl(QWidget* parent)
   m_ConfElements.clear();
 
   int i=1;
-  for (cmActionsIt = cmActions.begin()
-    ; cmActionsIt != cmActions.end()
-    ; ++cmActionsIt)
-  {
+  for (cmActionsIt = cmActions.begin(); cmActionsIt != cmActions.end(); ++cmActionsIt) {
     QString cmNodeDescriptorName = (*cmActionsIt)->GetAttribute("nodeDescriptorName");
     QString cmLabel = (*cmActionsIt)->GetAttribute("label");
     QString cmClass = (*cmActionsIt)->GetAttribute("class");
-    if(!cmNodeDescriptorName.isEmpty() &&
-       !cmLabel.isEmpty() &&
-       !cmClass.isEmpty())
-    {
+
+    if(!cmNodeDescriptorName.isEmpty() && !cmLabel.isEmpty() && !cmClass.isEmpty()) {
       QString cmIcon = (*cmActionsIt)->GetAttribute("icon");
       // create context menu entry here
       tmpDescriptor = QmitkNodeDescriptorManager::GetInstance()->GetDescriptor(cmNodeDescriptorName);
@@ -404,12 +404,10 @@ void sv4guiQmitkDataManagerView::CreateQtPartControl(QWidget* parent)
       m_DescriptorActionList.push_back(std::pair<QmitkNodeDescriptor*, QAction*>(diffusionImageDataNodeDescriptor, m_ColormapAction));
   }
 
-  QAction* reinitAction = new QAction(QIcon(":/org.sv.gui.qt.datamanager/Refresh_48.png"), "Reinit", this);
-  QObject::connect( reinitAction, SIGNAL( triggered(bool) )
-    , this, SLOT( ReinitSelectedNodes(bool) ) );
+  QAction* reinitAction = new QAction(QIcon(":/org.sv.gui.qt.datamanager/Refresh_48.png"), tr("Reinit"), this);
+  QObject::connect( reinitAction, SIGNAL( triggered(bool) ), this, SLOT( ReinitSelectedNodes(bool) ) );
   imageDataNodeDescriptor->AddAction(reinitAction);
   m_DescriptorActionList.push_back(std::pair<QmitkNodeDescriptor*, QAction*>(imageDataNodeDescriptor,reinitAction));
-
 
   m_SurfaceRepresentation = new QAction("Surface Representation", this);
   m_SurfaceRepresentation->setMenu(new QMenu(m_NodeTreeView));
@@ -462,6 +460,18 @@ void sv4guiQmitkDataManagerView::CreateQtPartControl(QWidget* parent)
   layout->setContentsMargins(0,0,0,0);
 
   m_Parent->setLayout(layout);
+}
+
+//-------------------------
+// OnNodeVisibilityChanged
+//-------------------------
+// Process the selection of a Data Manager check box (in front of a Data Node).
+//
+// This toggles the Data Node visibility.
+//
+void sv4guiQmitkDataManagerView::OnNodeVisibilityChanged()
+{
+  mitk::RenderingManager::GetInstance()->RequestUpdateAll();
 }
 
 void sv4guiQmitkDataManagerView::SetFocus()
@@ -546,6 +556,24 @@ void sv4guiQmitkDataManagerView::OnPreferencesChanged(const berry::IBerryPrefere
 
 }
 
+//-----------------------------------
+// NodeTableViewContextMenuRequested
+//-----------------------------------
+// Process righ-click on a Data Node. 
+//
+// This displays a node's context menu that allows selecting standard
+// menu items
+//    Gloval Reinit
+//    Save   
+//    Show onlt selected nodes
+//    Toggle visibility        
+//    Details
+//
+// and menu items specificy to the type (e.g. Images, Meshes, Models) of Data Node
+//    Images: Add / Replace image 
+//    Meshes: Create mesh
+//
+//
 void sv4guiQmitkDataManagerView::NodeTableViewContextMenuRequested( const QPoint & pos )
 {
   QModelIndex selectedProxy = m_NodeTreeView->indexAt ( pos );
@@ -553,27 +581,23 @@ void sv4guiQmitkDataManagerView::NodeTableViewContextMenuRequested( const QPoint
   mitk::DataNode::Pointer node = m_NodeTreeModel->GetNode(selected);
   QList<mitk::DataNode::Pointer> selectedNodes = this->GetCurrentSelection();
 
-  if(!selectedNodes.isEmpty())
-  {
+  if(!selectedNodes.isEmpty()) {
     m_NodeMenu->clear();
     QList<QAction*> actions;
-    if(selectedNodes.size() == 1 )
-    {
+    if(selectedNodes.size() == 1) {
       actions = QmitkNodeDescriptorManager::GetInstance()->GetActions(node);
-
-      for(QList<QAction*>::iterator it = actions.begin(); it != actions.end(); ++it)
-      {
+      for(QList<QAction*>::iterator it = actions.begin(); it != actions.end(); ++it) {
         (*it)->setData(QVariant::fromValue(node.GetPointer()));
       }
-    }
-    else
+    } else {
       actions = QmitkNodeDescriptorManager::GetInstance()->GetActions(selectedNodes);
+    }
 
-    if (!m_ShowInActions.isEmpty())
-    {
+    if (!m_ShowInActions.isEmpty()) {
       QMenu* showInMenu = m_NodeMenu->addMenu("Show In");
       showInMenu->addActions(m_ShowInActions);
     }
+
     m_NodeMenu->addActions(actions);
     m_NodeMenu->popup(QCursor::pos());
   }
@@ -835,25 +859,42 @@ void sv4guiQmitkDataManagerView::SurfaceRepresentationActionToggled( bool /*chec
 
 }
 
+//---------------------
+// ReinitSelectedNodes
+//---------------------
+// Process a Data Node 'R' hotkey or 'Reinit' context menu selection.
+//
+// This centers the view on the bounding box center of the selected Data Node geometry 
+//
 void sv4guiQmitkDataManagerView::ReinitSelectedNodes( bool )
 {
-  mitk::IRenderWindowPart* renderWindow = this->GetRenderWindowPart();
+  auto renderWindow = this->GetRenderWindowPart();
 
-  if (renderWindow == NULL)
+  if (renderWindow == nullptr) {
     renderWindow = this->OpenRenderWindowPart(false);
-
-  QList<mitk::DataNode::Pointer> selectedNodes = this->GetCurrentSelection();
-
-  foreach(mitk::DataNode::Pointer node, selectedNodes)
-  {
-    mitk::BaseData::Pointer basedata = node->GetData();
-    if ( basedata.IsNotNull() &&
-      basedata->GetTimeGeometry()->IsValid() )
-    {
-      renderWindow->GetRenderingManager()->InitializeViews(
-          basedata->GetTimeGeometry(), mitk::RenderingManager::REQUEST_UPDATE_ALL, true );
-    }
   }
+
+  if (renderWindow == nullptr) {
+    return;
+  }
+
+  // Check for bounding box for selected nodes.
+  //
+  auto dataStorage = this->GetDataStorage();
+  auto selectedNodesIncludedInBoundingBox = mitk::NodePredicateAnd::New(
+    mitk::NodePredicateNot::New(mitk::NodePredicateProperty::New("includeInBoundingBox", mitk::BoolProperty::New(false))),
+    mitk::NodePredicateProperty::New("selected", mitk::BoolProperty::New(true))
+  );
+
+  auto nodes = dataStorage->GetSubset(selectedNodesIncludedInBoundingBox);
+
+  if (nodes->empty()) {
+    return;
+  }
+
+  // Get the bounding box for visible nodes and reset the view.
+  auto boundingGeometry = dataStorage->ComputeBoundingGeometry3D(nodes, "visible");
+  mitk::RenderingManager::GetInstance()->InitializeViews(boundingGeometry);
 }
 
 void sv4guiQmitkDataManagerView::RemoveSelectedNodes( bool )
@@ -932,6 +973,7 @@ void sv4guiQmitkDataManagerView::ShowOnlySelectedNodes( bool )
 
 void sv4guiQmitkDataManagerView::ToggleVisibilityOfSelectedNodes( bool )
 {
+
   QList<mitk::DataNode::Pointer> selectedNodes = this->GetCurrentSelection();
 
   bool isVisible = false;
@@ -965,12 +1007,15 @@ void sv4guiQmitkDataManagerView::NodeChanged(const mitk::DataNode* node)
     predicateTypes->AddPredicate(mitk::NodePredicateDataType::New("sv4guiModelFolder"));
     predicateTypes->AddPredicate(mitk::NodePredicateDataType::New("sv4guiMeshFolder"));
     predicateTypes->AddPredicate(mitk::NodePredicateDataType::New("sv4guiSimulationFolder"));
+    predicateTypes->AddPredicate(mitk::NodePredicateDataType::New("sv4guisvFSIFolder"));
+    predicateTypes->AddPredicate(mitk::NodePredicateDataType::New("sv4guiSimulation1dFolder"));
 
     if(predicateTypes->CheckNode(node)){
         bool previousVisible=false;
         node->GetBoolProperty("previous visibility", previousVisible);
         bool currentVisible=false;
         node->GetBoolProperty("visible", currentVisible);
+
         if(currentVisible!=previousVisible){
             mitk::DataStorage::SetOfObjects::ConstPointer rs = this->GetDataStorage()->GetDerivations(node);
             for(int i=0;i<rs->size();i++){

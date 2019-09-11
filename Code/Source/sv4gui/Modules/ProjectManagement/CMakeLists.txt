@@ -51,8 +51,11 @@ simvascular_create_module(
   ${SV_LIB_MODULE_MODEL_NAME}
   ${SV_LIB_MODULE_MESH_NAME}
   ${SV_LIB_MODULE_SIMULATION_NAME}
+  ${SV_LIB_MODULE_SIMULATION1D_NAME}
   ${SV_LIB_MODULE_SVFSI_NAME})
 #-----------------------------------------------------------------------------
+
+include_directories(${TINYXML_INCLUDE_DIR})
 
 if(SV_INSTALL_LIBS)
   install(TARGETS ${lib}

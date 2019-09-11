@@ -40,6 +40,8 @@
 
 #include "sv4gui_ProcessHandler.h"
 #include "sv4gui_SolverProcessHandler.h"
+#include "sv4gui_SimulationPreferences.h"
+#include "sv4gui_MPIPreferences.h"
 
 #include "sv4gui_ModelDataInteractor.h"
 
@@ -49,6 +51,7 @@
 #include <QStandardItemModel>
 #include <QProcess>
 #include <QMessageBox>
+#include <QItemSelection>
 
 namespace Ui {
 class sv4guiSimulationView;
@@ -61,6 +64,7 @@ class sv4guiSimulationView : public sv4guiQmitkFunctionality
 public:
 
     static const QString EXTENSION_ID;
+    static const QString MsgTitle;
 
     sv4guiSimulationView();
 
@@ -142,11 +146,11 @@ public slots:
 
     void UpdateSimJobNumProcs();
 
-    void SetupInternalSolverPaths();
-
     void ShowCalculateFowsWidget(bool checked = false);
 
     void ShowModel(bool checked = false);
+
+    void UseMpi(bool checked = false);
 
 public:
 
@@ -225,23 +229,27 @@ private:
 
     QStandardItemModel* m_TableModelSolver;
 
-    QString m_InternalPresolverPath;
-    QString m_InternalFlowsolverPath;
-    QString m_InternalFlowsolverNoMPIPath;
-    QString m_InternalPostsolverPath;
-    QString m_InternalMPIExecPath;
+    sv4guiMPIPreferences::MpiImplementation m_MpiImplementation;
 
-    QString m_ExternalPresolverPath;
-    QString m_ExternalFlowsolverPath;
-    QString m_ExternalFlowsolverNoMPIPath;
-    bool m_UseMPI;
+    QString m_PresolverPath;
+    QString m_FlowsolverPath;
+    QString m_FlowsolverNOMPIPath;
+    QString m_PostsolverPath;
+
     QString m_MPIExecPath;
+    bool m_UseMPI;
     bool m_UseCustom;
     QString m_SolverTemplatePath;
-    QString m_ExternalPostsolverPath;
-    QString m_ExternalMPIExecPath;
 
     bool m_ConnectionEnabled;
+
+    sv4guiSimulationPreferences m_DefaultPrefs;
+    sv4guiMPIPreferences m_DefaultMPIPrefs;
+
+    void CheckSolver();
+    void CheckSolverNOMPI();
+    void CheckMpi();
+    int GetStartTimeStep(const QString& runPath, const QString& jobPath, const int numProcs);
 
 };
 

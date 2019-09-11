@@ -32,11 +32,18 @@ project(org_sv_gui_qt_application)
 
 set(lib org_sv_gui_qt_application)
 
+if(SV_USE_TINYXML)
+  include_directories(${TINYXML_INCLUDE_DIR})
+endif()
+
 if(SV_USE_MITK_CONFIG)
   mitk_create_plugin(
     EXPORT_DIRECTIVE SV_QT_APPLICATION
     EXPORTED_INCLUDE_SUFFIXES src
-    MODULE_DEPENDS MitkQtWidgets MitkQtWidgetsExt org_mitk_gui_qt_datamanager ${SV_LIB_MODULE_PROJECTMANAGEMENT_NAME} ${SV_LIB_MODULE_SIMULATION_NAME}
+    MODULE_DEPENDS MitkQtWidgets MitkQtWidgetsExt org_mitk_gui_qt_datamanager ${SV_LIB_MODULE_PROJECTMANAGEMENT_NAME} 
+    ${SV_LIB_MODULE_SIMULATION_NAME}
+    ${SV_LIB_MODULE_SIMULATION1D_NAME}
+    ${SV_LIB_MODULE_SVFSI_NAME}
     ${SV_LIB_MODULE_MESH_NAME}
     ${SV_LIB_MODULE_SEGMENTATION_NAME}
     ${SV_LIB_MODULE_PATH_NAME}
@@ -44,15 +51,34 @@ if(SV_USE_MITK_CONFIG)
     ${SV_LIB_PATH_NAME}
   )
 else()
-  simvascular_create_plugin(
+    if(SV_USE_MITK_SEGMENTATION)
+        simvascular_create_plugin(
     EXPORT_DIRECTIVE SV_QT_APPLICATION
-    MODULE_DEPENDS MitkQtWidgets org_sv_gui_qt_datamanager ${SV_LIB_MODULE_PROJECTMANAGEMENT_NAME} ${SV_LIB_MODULE_SIMULATION_NAME}
+    MODULE_DEPENDS MitkQtWidgets org_sv_gui_qt_datamanager ${SV_LIB_MODULE_PROJECTMANAGEMENT_NAME} 
+    ${SV_LIB_MODULE_SIMULATION_NAME}
+    ${SV_LIB_MODULE_SIMULATION1D_NAME}
+    ${SV_LIB_MODULE_SVFSI_NAME}
+    ${SV_LIB_MODULE_MESH_NAME}
+    ${SV_LIB_MODULE_SEGMENTATION_NAME}
+    ${SV_LIB_MODULE_PATH_NAME}
+    ${SV_LIB_MODULE_MODEL_NAME}
+    ${SV_LIB_PATH_NAME}
+    ${SV_LIB_MODULE_MITKSEGMENTATION_NAME}
+  )
+    else()
+        simvascular_create_plugin(
+    EXPORT_DIRECTIVE SV_QT_APPLICATION
+    MODULE_DEPENDS MitkQtWidgets org_sv_gui_qt_datamanager ${SV_LIB_MODULE_PROJECTMANAGEMENT_NAME} 
+    ${SV_LIB_MODULE_SIMULATION_NAME}
+    ${SV_LIB_MODULE_SIMULATION1D_NAME}
+    ${SV_LIB_MODULE_SVFSI_NAME}
     ${SV_LIB_MODULE_MESH_NAME}
     ${SV_LIB_MODULE_SEGMENTATION_NAME}
     ${SV_LIB_MODULE_PATH_NAME}
     ${SV_LIB_MODULE_MODEL_NAME}
     ${SV_LIB_PATH_NAME}
   )
+  endif()
 endif()
 
 target_include_directories(${lib} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/../org.sv.gui.qt.projectmanager")

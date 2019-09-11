@@ -40,7 +40,7 @@
 #endif
 #include "vtksys/SystemTools.hxx"
 
-#ifdef SV_USE_QT_GUI
+#ifdef SV_USE_SV4_GUI
   #include <QApplication>
   #include <QDir>
   #include <QVariant>
@@ -176,9 +176,10 @@ int sv4guiMain(int argc, char *argv[],bool use_provisioning_file, bool use_workb
 #ifdef SV_USE_PYTHON
        pluginsToStart.push_back("org_mitk_gui_qt_python");
 #endif
-       pluginsToStart.push_back("org_mitk_gui_qt_segmentation");
+       if (use_workbench){
+         pluginsToStart.push_back("org_mitk_gui_qt_segmentation");
+       }
        pluginsToStart.push_back("org_mitk_gui_qt_volumevisualization");
-
        // SimVascular plugins
        if (!use_workbench) {
          pluginsToStart.push_back("org_sv_gui_qt_application");
@@ -190,8 +191,12 @@ int sv4guiMain(int argc, char *argv[],bool use_provisioning_file, bool use_workb
          pluginsToStart.push_back("org_sv_gui_qt_segmentation");
          pluginsToStart.push_back("org_sv_gui_qt_meshing");
          pluginsToStart.push_back("org_sv_gui_qt_simulation");
+         pluginsToStart.push_back("org_sv_gui_qt_simulation1d");
          pluginsToStart.push_back("org_sv_gui_qt_imageprocessing");
          pluginsToStart.push_back("org_sv_gui_qt_svfsi");
+#ifdef SV_USE_MITK_SEGMENTATION
+         pluginsToStart.push_back("org_sv_gui_qt_mitksegmentation");
+#endif
 #ifdef SV_USE_PYTHON
          pluginsToStart.push_back("org_sv_pythondatanodes");
 #endif

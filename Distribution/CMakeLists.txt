@@ -158,6 +158,7 @@ if(LINUX)
 	INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/qt.conf DESTINATION "/usr/local/sv/simvascular/${SV_INSTALL_VERSION_DIR}/bin")
 
 	INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/qt_ext.conf DESTINATION "/usr/local/sv/simvascular/${SV_INSTALL_VERSION_DIR}/svExternals/bin" RENAME "qt.conf")
+	INSTALL(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../Python/site-packages" DESTINATION "/usr/local/sv/simvascular/${SV_INSTALL_VERSION_DIR}/Python${PYTHON_MAJOR_VERSION}.${PYTHON_MINOR_VERSION}")
 
 endif()
 #-----------------------------------------------------------------------------
@@ -191,6 +192,9 @@ if(APPLE)
 		if(SV_DEVELOPER_OUTPUT)
 			message(STATUS "CPACK_PACKAGE_FILE_NAME: ${CPACK_PACKAGE_FILE_NAME}.dmg")
 		endif()
+
+                INSTALL(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../Python/site-packages" 
+                        DESTINATION "Python${PYTHON_MAJOR_VERSION}.${PYTHON_MINOR_VERSION}")
 	endif()
 endif(APPLE)
 #-----------------------------------------------------------------------------

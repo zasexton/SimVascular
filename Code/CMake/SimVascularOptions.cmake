@@ -88,13 +88,18 @@ option(SV_EXTERNALS_INSTALL_HEADERS "If ON, The externals headers will be includ
 # Qt
 simvascular_add_new_external(Qt5 ${Qt5_VERSION} ON ON qt)
 
+# ML
+if (SV_EXTERNALS_VERSION_NUMBER VERSION_GREATER_EQUAL "2019.02")
+  simvascular_add_new_external(ml ${ML_VERSION} ON ON ml)
+endif()
+
 # HDF5
-if (SV_EXTERNALS_VERSION_NUMBER GREATER_EQUAL "2018.05")
+if (SV_EXTERNALS_VERSION_NUMBER VERSION_GREATER_EQUAL "2018.05")
   simvascular_add_new_external(HDF5 ${HDF5_VERSION} ON ON hdf5 hdf5)
 endif()
 
 # TINYXML2
-if (SV_EXTERNALS_VERSION_NUMBER GREATER_EQUAL "2018.05")
+if (SV_EXTERNALS_VERSION_NUMBER VERSION_GREATER_EQUAL "2018.05")
   simvascular_add_new_external(TINYXML2 ${TINYXML2_VERSION} ON ON tinyxml2 tinyxml2)
 endif()
 
@@ -124,6 +129,7 @@ simvascular_add_new_external(OpenCASCADE ${OpenCASCADE_VERSION} ON ON opencascad
 
 # MITK
 simvascular_add_new_external(MITK ${MITK_VERSION} ON ON mitk)
+
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
@@ -138,7 +144,9 @@ option(SV_USE_TETGEN "Enable Tetgen Meshing Plugin" ON)
 
 option(SV_USE_TETGEN_ADAPTOR "Option to use open source mesh adaption" ON)
 
-option(SV_USE_PYTHON "Use Python" OFF)
+option(SV_USE_TINYXML "Use TinyXML" ON)
+
+option(SV_USE_PYTHON "Use Python" ON)
 
 option(SV_USE_TCL "Use Tcl" ON)
 
@@ -162,13 +170,15 @@ option(SV_USE_MODULES_SHARED_LIBRARIES "Option to build the thirdparty libs as s
 
 #-----------------------------------------------------------------------------
 # Option to build qt GUI
-option(SV_USE_QT_GUI "Option to build the SimVascular QT GUI" ON)
+option(SV_USE_SV4_GUI "Option to build the SimVascular QT GUI" ON)
 
 option(SV_USE_QT "Option to build the SimVascular QT" ON)
 
 option(SV_NO_PYTHONQT_ALL "Option to use PythonQt_all" ON)
 
 option(SV_USE_MITK_CONFIG "Option to use MITKConfig.cmake" OFF)
+
+option(SV_USE_MITK_SEGMENTATION "Option to add the mitk segmentation plugin" OFF)
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------

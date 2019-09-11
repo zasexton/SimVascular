@@ -38,7 +38,7 @@
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
-cmake_minimum_required(VERSION 3.7.0)
+cmake_minimum_required(VERSION 3.10.0)
 
 if (POLICY CMP0040)
 	cmake_policy(SET CMP0040 OLD)
@@ -98,6 +98,15 @@ SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
 
 #-----------------------------------------------------------------------------
 # Include Initial Options
+# NOTE: seems like SimVascularDependentOptions should be read BEFORE
+# including SimVascularExternalVersions.  This seems to break things,
+# so for now repeating code to ignore mitk when buiding without sv4gui
+if(DEFINED SV_USE_SV4_GUI)
+  if(NOT SV_USE_SV4_GUI)
+    set(SV_USE_MITK "OFF" CACHE BOOL "Force OFF" FORCE)
+    set(SV_USE_MITK_SHARED "OFF" CACHE BOOL "Force OFF" FORCE)
+  endif()
+endif()
 include(SimVascularExternalsVersions)
 include(SimVascularOptions)
 include(SimVascularDependentOptions)
@@ -246,7 +255,7 @@ endif()
 
 #-----------------------------------------------------------------------------
 # Modules
-if(SV_USE_QT_GUI)
+if(SV_USE_SV4_GUI)
   set(SV_MODULE_DIRS ${SV_MODULE_DIRS}
     "Source/sv4gui/Modules/Common"
     "Source/sv4gui/Modules/Path"
@@ -254,11 +263,17 @@ if(SV_USE_QT_GUI)
     "Source/sv4gui/Modules/Model/Common"
     "Source/sv4gui/Modules/Mesh/Common"
     "Source/sv4gui/Modules/Simulation"
+    "Source/sv4gui/Modules/Simulation1d"
     "Source/sv4gui/Modules/ProjectManagement"
     "Source/sv4gui/Modules/QtWidgets"
     "Source/sv4gui/Modules/ImageProcessing"
     "Source/sv4gui/Modules/svFSI"
+		"Source/sv4gui/Modules/MachineLearning"
      )
+
+  #if(SV_USE_ONEDSOLVER)
+   # set(SV_MODULE_DIRS ${SV_MODULE_DIRS} "Source/sv4gui/Modules/Simulation1d")
+  #endif()
 
   if(SV_USE_OpenCASCADE)
     set(SV_MODULE_DIRS ${SV_MODULE_DIRS} "Source/sv4gui/Modules/Model/OCCT")
@@ -278,7 +293,7 @@ endif()
 
 #-----------------------------------------------------------------------------
 # Plugins
-if(SV_USE_QT_GUI)
+if(SV_USE_SV4_GUI)
   if(NOT SV_USE_MITK_CONFIG)
       set(SV_PLUGIN_DIRS ${SV_PLUGIN_DIRS}
       "Source/sv4gui/Plugins/org.sv.projectdatanodes"
@@ -289,11 +304,15 @@ if(SV_USE_QT_GUI)
       "Source/sv4gui/Plugins/org.sv.gui.qt.modeling"
       "Source/sv4gui/Plugins/org.sv.gui.qt.meshing"
       "Source/sv4gui/Plugins/org.sv.gui.qt.simulation"
+      "Source/sv4gui/Plugins/org.sv.gui.qt.simulation1d"
       "Source/sv4gui/Plugins/org.sv.gui.qt.application"
       "Source/sv4gui/Plugins/org.sv.gui.qt.imageprocessing"
       "Source/sv4gui/Plugins/org.sv.gui.qt.svfsi")
       if(SV_USE_PYTHON)
         LIST(APPEND SV_PLUGIN_DIRS "Source/sv4gui/Plugins/org.sv.pythondatanodes")
+      endif()
+      if(SV_USE_MITK_SEGMENTATION)
+        LIST(APPEND SV_PLUGIN_DIRS "Source/sv4gui/Plugins/org.sv.gui.qt.mitksegmentation")
       endif()
   endif()
 endif()
@@ -421,7 +440,7 @@ endforeach()
 # Setup Plugins for provisioning file, must after add_subdirectory for Modules
 include(${CMAKE_CURRENT_SOURCE_DIR}/Source/sv4gui/Plugins/PluginList.cmake)
 if(SV_USE_MITK_CONFIG)
-  if(SV_USE_QT_GUI)
+  if(SV_USE_SV4_GUI)
     macro(GetMyTargetLibraries all_target_libraries varname)
       set(re_ctkplugin "^org_sv_[a-zA-Z0-9_]+$")
       set(_tmp_list)
@@ -457,7 +476,7 @@ endforeach()
 
 #-----------------------------------------------------------------------------
 # Configure Exe Scripts, this should be the last subdirectory
-if(SV_USE_QT_GUI)
+if(SV_USE_SV4_GUI)
   include(SimVascularInstallQt)
 endif()
 include(SimVascularInstallLibs)

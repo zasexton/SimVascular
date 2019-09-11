@@ -67,6 +67,14 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
+#include <QDir>
+#include <QString>
+#include <QDomDocument>
+#include <QDomElement>
+#include <QFile>
+#include <QAbstractItemView>
+#include <QListWidgetItem>
+
 #include <iostream>
 using namespace std;
 
@@ -166,6 +174,7 @@ void sv4guiSeg2DEdit::CreateQtPartControl( QWidget *parent )
 
     connect(ui->btnLevelSet, SIGNAL(clicked()), this, SLOT(CreateLSContour()) );
     connect(ui->btnThreshold, SIGNAL(clicked()), this, SLOT(CreateThresholdContour()) );
+
     connect(ui->btnCircle, SIGNAL(clicked()), this, SLOT(CreateCircle()) );
     connect(ui->btnEllipse, SIGNAL(clicked()), this, SLOT(CreateEllipse()) );
     connect(ui->btnSplinePoly, SIGNAL(clicked()), this, SLOT(CreateSplinePoly()) );
@@ -206,6 +215,19 @@ void sv4guiSeg2DEdit::CreateQtPartControl( QWidget *parent )
     ui->btnDelete->setShortcut(QKeySequence("Ctrl+D"));
 
     ui->listWidget->installEventFilter(this);
+
+    //ml additions
+    setupMLui();
+
+    // If m_ContourGroup is null then the panel is not associated with any 
+    // contour group. This happens when tool panels from previous sessions
+    // are created when SV starts.
+    //
+    if (m_ContourGroup == nullptr) { 
+        ui->SinglePathTab->setEnabled(false);
+    } else {
+        ui->SinglePathTab->setEnabled(true);
+    }
 }
 
 void sv4guiSeg2DEdit::Visible()
@@ -242,6 +264,7 @@ int sv4guiSeg2DEdit::GetTimeStep()
 
 void sv4guiSeg2DEdit::OnSelectionChanged(std::vector<mitk::DataNode*> nodes )
 {
+
 //    if(!IsActivated())
     if(!IsVisible())
     {
@@ -252,7 +275,7 @@ void sv4guiSeg2DEdit::OnSelectionChanged(std::vector<mitk::DataNode*> nodes )
     {
         ui->resliceSlider->turnOnReslice(false);
         ClearAll();
-        m_Parent->setEnabled(false);
+        ui->SinglePathTab->setEnabled(false);
         return;
     }
 
@@ -270,14 +293,16 @@ void sv4guiSeg2DEdit::OnSelectionChanged(std::vector<mitk::DataNode*> nodes )
     m_ContourGroup=dynamic_cast<sv4guiContourGroup*>(groupNode->GetData());
     if(!m_ContourGroup)
     {
+        std::cout << "no contour group selected\n";
         ui->resliceSlider->turnOnReslice(false);
         ClearAll();
-        m_Parent->setEnabled(false);
+        ui->SinglePathTab->setEnabled(false);
         return;
     }
 
     m_Parent->setEnabled(true);
-
+    ui->SinglePathTab->setEnabled(true);
+    ////remove_toolbox     ui->segToolbox->setCurrentIndex(1);
 //    std::string groupPathName=m_ContourGroup->GetPathName();
     int  groupPathID=m_ContourGroup->GetPathID();
 
@@ -750,6 +775,9 @@ void sv4guiSeg2DEdit::CreateContours(SegmentationMethod method)
             case THRESHOLD_METHOD:
                 contour=sv4guiSegmentationUtils::CreateThresholdContour(ui->resliceSlider->getPathPoint(posID),m_cvImage->GetVtkStructuredPoints(),ui->sliderThreshold->value(), ui->resliceSlider->getResliceSize());
                 break;
+            case ML_METHOD:
+                contour=doMLContour(ui->resliceSlider->getPathPoint(posID));
+                break;
             default:
                 break;
         }
@@ -856,6 +884,28 @@ void sv4guiSeg2DEdit::CreateThresholdContour()
     m_CurrentSegButton->setStyleSheet("background-color: lightskyblue");
 
     PreparePreviewInteraction("Threshold");
+
+}
+
+void sv4guiSeg2DEdit::CreateMLContour()
+{
+    if(m_cvImage==NULL)
+        return;
+
+    if(m_CurrentSegButton!=ui->btnML)
+    {
+        ResetGUI();
+
+        m_CurrentSegButton=ui->btnML;
+
+        SetSecondaryWidgetsVisible(true);
+
+        initialize();
+
+        return;
+    }
+
+    CreateContours(ML_METHOD);
 
 }
 
@@ -1251,8 +1301,7 @@ void sv4guiSeg2DEdit::LoftContourGroup()
 
 void sv4guiSeg2DEdit::ShowLoftWidget()
 {
-    svLoftingParam *param=m_ContourGroup->GetLoftingParam();
-
+    svLoftingParam *param = m_ContourGroup->GetLoftingParam();
     m_LoftWidget->UpdateGUI(param);
     m_LoftWidget->show();
 }
@@ -1419,12 +1468,12 @@ void sv4guiSeg2DEdit::CreateManualCircle(bool)
     contour->SetPathPoint(ui->resliceSlider->getCurrentPathPoint());
     contour->SetPlaced(true);
     contour->SetMethod(contour->GetMethod());
-    
+
     centerPoint[0]+=contour->GetPlaneGeometry()->GetSpacing()[0]*contour->GetPlaneGeometry()->GetBounds()[1]/2;
     centerPoint[1]+=contour->GetPlaneGeometry()->GetSpacing()[1]*contour->GetPlaneGeometry()->GetBounds()[3]/2;
     boundaryPoint[0]=centerPoint[0]+radius;
     boundaryPoint[1]=centerPoint[1];
-    
+
     mitk::Point3D pt1,pt2;
     contour->GetPlaneGeometry()->Map(centerPoint,pt1);
     contour->GetPlaneGeometry()->Map(boundaryPoint,pt2);
@@ -1434,7 +1483,7 @@ void sv4guiSeg2DEdit::CreateManualCircle(bool)
     contour->SetControlPoints(controlPoints);
     contour->SetSubdivisionType(sv4guiContour::CONSTANT_SPACING);
     contour->SetSubdivisionSpacing(GetVolumeImageSpacing());
-    
+
 
     mitk::OperationEvent::IncCurrObjectEventId();
 
@@ -1817,3 +1866,311 @@ void sv4guiSeg2DEdit::SelectContour3D()
             ui->listWidget->setCurrentRow(index);
     }
 }
+
+/*
+machine learning additions
+*/
+void sv4guiSeg2DEdit::setupMLui(){
+  connect(ui->multiSegButton, SIGNAL(clicked()), this, SLOT(segmentPaths()));
+
+  connect(ui->selectAllPathsCheckBox, SIGNAL(clicked()), this, SLOT(selectAllPaths()));
+
+  // connect(ui->sampleNetButton, SIGNAL(clicked()), this, SLOT(sampleNetwork()));
+
+  ////remove_toolbox  connect(ui->segToolbox, SIGNAL(currentChanged(int)),
+  ////remove_toolbox   this, SLOT(segTabSelected()));
+
+  connect(ui->btnML, SIGNAL(clicked()), this, SLOT(CreateMLContour()) );
+
+  updatePaths();
+
+}
+
+void sv4guiSeg2DEdit::segTabSelected(){
+  std::cout << "select seg tab\n";
+  ////remove_toolbox   switch(ui->segToolbox->currentIndex()){
+  ////remove_toolbox   case 1:
+  ////remove_toolbox   break;
+
+  ////remove_toolbox   case 0:
+      std::cout << "single path selected\n";
+      if(!m_ContourGroup)
+      {
+          ui->resliceSlider->turnOnReslice(false);
+          ClearAll();
+          ////remove_toolbox  ui->segToolbox->setCurrentIndex(1);
+          QMessageBox::warning(NULL,"No segmentation selected","Create, or Select a segmentation before choosing single path segmentation!");
+      }
+      ////remove_toolbox     break;
+      ////remove_toolbox  }
+}
+
+void sv4guiSeg2DEdit::initialize(){
+  bool ml_init;
+  GetDataStorage()->GetNamedNode("Segmentations")->GetBoolProperty("ml_init",ml_init);
+
+  if(!ml_init){
+    QMessageBox::warning(NULL,"Initializing machine learning","SimVascular ML segmentation is about to be loaded, this may take a minute");
+    GetDataStorage()->GetNamedNode("Segmentations")->SetBoolProperty("ml_init",true);
+  }
+
+  mitk::NodePredicateDataType::Pointer isProjFolder = mitk::NodePredicateDataType::New("sv4guiProjectFolder");
+  mitk::DataNode::Pointer projFolderNode = GetDataStorage()->GetNode (isProjFolder);
+
+
+  if (projFolderNode){
+    std::string projPath;
+    projFolderNode->GetStringProperty("project path", projPath);
+
+    QString QprojPath = QString(projPath.c_str());
+
+    QDir dir(QprojPath);
+
+    QString projectConfigFileName=".svproj";
+
+    QString projectConfigFilePath=dir.absoluteFilePath(projectConfigFileName);
+
+    std::string projConfigFile = projectConfigFilePath.toStdString();
+
+    //get image path
+    QDomDocument doc("svproj");
+    QString imageFolderName="Images";
+
+    QFile xmlFile(projectConfigFilePath);
+    xmlFile.open(QIODevice::ReadOnly);
+
+    QString *em=NULL;
+    doc.setContent(&xmlFile,em);
+    xmlFile.close();
+
+    QDomElement projDesc      = doc.firstChildElement("projectDescription");
+    QDomElement imagesElement = projDesc.firstChildElement("images");
+    imageFolderName           = imagesElement.attribute("folder_name");
+    QDomNodeList imageList    = imagesElement.elementsByTagName("image");
+
+    QDomNode imageNode = imageList.item(0);
+    QDomElement imageElement=imageNode.toElement();
+
+    QString inProj    = imageElement.attribute("in_project");
+    QString imageName = imageElement.attribute("name");
+    QString imagePath = imageElement.attribute("path");
+
+    if(inProj=="yes")
+    {
+        if(imagePath!="")
+        {
+            m_imageFilePath = (projPath
+            +"/"+imageFolderName.toStdString()+"/"+imagePath.toStdString());
+        }
+        else if(imageName!="")
+        {
+            m_imageFilePath = (projPath
+            +"/"+imageFolderName.toStdString()+"/"+imageName.toStdString());
+        }
+    }
+    else
+    {
+        m_imageFilePath = imageElement.attribute("path").toStdString();
+    }
+
+    ml_utils = sv4gui_MachineLearningUtils::getInstance("googlenet_c30_train300k_aug10_clean");
+    ml_utils->setImage(m_imageFilePath);
+
+  }//end if projectfoldernode
+
+}
+
+void sv4guiSeg2DEdit::selectAllPaths(){
+  bool checked = (ui->selectAllPathsCheckBox->checkState() == Qt::Checked);
+
+  for (int i = 0; i < ui->pathList->count(); i++){
+    if (checked){
+      ui->pathList->item(i)->setCheckState(Qt::Checked);
+    }else{
+      ui->pathList->item(i)->setCheckState(Qt::Unchecked);
+    }
+  }
+}
+
+void sv4guiSeg2DEdit::updatePaths(){
+  auto dss = GetDataStorage();
+  if(dss.IsNull()) {
+    std::cout << "No data storage found in sv4guiSeg2DEdit::updatePaths\n";
+    return ;
+  }
+
+  auto path_folder_node = dss->GetNamedNode("Paths");
+
+  if(path_folder_node == nullptr) {
+    std::cout << "No path_folder_node found in sv4guiSeg2DEdit::updatePaths\n";
+    return ;
+  }
+
+  auto rs       = dss->GetDerivations(path_folder_node);
+
+  if (rs->size() == 0){
+    std::cout << "No paths found\n";
+    return ;
+  }
+
+  ui->pathList->clear();
+
+  for (int i = 0; i < rs->size(); i++){
+    mitk::DataNode::Pointer Node=rs->GetElement(i);
+    std::cout << i << ": " << Node->GetName() << "\n";
+
+    //auto q_name = QString(Node->GetName().c_str());
+
+    auto item = new QListWidgetItem(Node->GetName().c_str(), ui->pathList);
+    item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+    item->setCheckState(Qt::Unchecked);
+
+    ui->pathList->addItem(item);
+  }
+}
+
+void sv4guiSeg2DEdit::segmentPaths(){
+  //paths
+  initialize();
+  auto path_folder_node = GetDataStorage()->GetNamedNode("Paths");
+  auto paths_list       = GetDataStorage()->GetDerivations(path_folder_node);
+
+  auto seg_folder_node = GetDataStorage()->GetNamedNode("Segmentations");
+  auto seg_nodes = GetDataStorage()->GetDerivations(seg_folder_node);
+  m_selected_paths.clear();
+
+  bool ok;
+  QString seg_code = QInputDialog::getText(m_Parent, tr("Segmentation Name"),
+                                       tr("Enter a name to append to the new segmentations"), QLineEdit::Normal,
+                                       "", &ok);
+
+  std::cout << "seg name " << seg_code.toStdString() << "\n";
+  for (int i = 0; i < ui->pathList->count(); i++){
+    if (ui->pathList->item(i)->checkState() == Qt::Checked){
+      auto name = ui->pathList->item(i)->text().toStdString();
+      auto new_seg_name = name+"_"+seg_code.toStdString();
+
+      for (int j = 0; j < seg_nodes->size(); j++){
+        auto seg_node = seg_nodes->GetElement(j);
+        auto seg_name = seg_node->GetName();
+        if (seg_name == new_seg_name){
+          QMessageBox::warning(NULL,("Segmentation " + seg_name +" already exists").c_str(),"Please use a different segmentation name!");
+          m_selected_paths.clear();
+          return;
+        }
+      }
+
+      m_selected_paths.push_back(name);
+      std::cout << "selected " << name << "\n";
+    }
+  }
+
+  for (int i = 0; i < m_selected_paths.size(); i++){
+    auto path_name = m_selected_paths[i];
+
+    for (int j = 0; j < paths_list->size(); j++){
+      auto path_node = paths_list->GetElement(j);
+
+      if (path_node->GetName() == path_name){
+        m_current_path_node = path_node;
+        std::cout << "segmenting " << path_name << "\n";
+
+        createContourGroup(path_name, path_name+"_"+seg_code.toStdString());
+
+        segmentPath();
+
+        break;
+      }
+
+    }
+  }
+}
+
+void sv4guiSeg2DEdit::createContourGroup(std::string path_name, std::string seg_name){
+  auto seg_folder_node = GetDataStorage()->GetNamedNode("Segmentations");
+
+  m_current_group = sv4guiContourGroup::New();
+  m_current_group->SetPathName(path_name);
+  m_current_group->SetDataModified();
+
+  sv4guiPath* selectedPath=dynamic_cast<sv4guiPath*>(m_current_path_node->GetData());
+
+  m_current_group->SetPathID(selectedPath->GetPathID());
+
+  auto seg_node = mitk::DataNode::New();
+  seg_node->SetName(seg_name);
+  seg_node->SetData(m_current_group);
+
+  GetDataStorage()->Add(seg_node, seg_folder_node);
+}
+
+void sv4guiSeg2DEdit::segmentPath(){
+  auto path = dynamic_cast<sv4guiPath*>(m_current_path_node->GetData());
+
+  auto path_element = path->GetPathElement(0);
+
+  auto path_points = path_element->GetPathPoints();
+
+  int n = 0;
+
+  m_interval = ui->intervalEdit->value();
+  m_numFourierModes = ui->intervalEdit->value();
+
+  for(int k = 0; k < path_points.size(); k += m_interval){
+
+    doSegmentation(path_points[k], k, n);
+    n+=1;
+
+  }
+}
+
+void sv4guiSeg2DEdit::doSegmentation(sv4guiPathElement::sv4guiPathPoint path_point,
+int index, int n_){
+
+  sv4guiContour* contour = doMLContour(path_point);
+
+  contour = contour->CreateSmoothedContour(m_numFourierModes);
+
+  m_current_group->IsEmptyTimeStep(0);
+
+  m_current_group->InsertContour(n_, contour, 0);
+  mitk::RenderingManager::GetInstance()->RequestUpdateAll();
+}
+
+
+sv4guiContour* sv4guiSeg2DEdit::doMLContour(sv4guiPathElement::sv4guiPathPoint path_point){
+  std::vector<std::vector<double>> points = ml_utils->segmentPathPoint(path_point);
+
+  if (points.size() <= 0){
+    std::cout << "contour empty points\n";
+    return NULL;
+  }
+
+  sv4guiContour* contour = new sv4guiContour();
+
+  //create contour and add points
+  contour->SetPathPoint(path_point);
+  contour->SetPlaced(true);
+  contour->SetMethod("ML");
+
+  std::vector<mitk::Point3D> contourPoints;
+  mitk::Point3D pt;
+
+  for (int i = 0; i < points.size(); i++){
+    pt[0] = points[i][0];
+    pt[1] = points[i][1];
+    pt[2] = points[i][2];
+
+    contourPoints.push_back(pt);
+  }
+
+  contour->SetClosed(true);
+
+  contour->SetContourPoints(contourPoints);
+
+  return contour;
+}
+
+// void sv4guiSeg2DEdit::sampleNetwork(){
+//   ml_utils->sampleNetwork();
+// }

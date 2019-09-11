@@ -37,7 +37,7 @@
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
-cmake_minimum_required(VERSION 3.7.0)
+cmake_minimum_required(VERSION 3.10.0)
 
 if (POLICY CMP0040)
   cmake_policy(SET CMP0040 OLD)
@@ -86,14 +86,22 @@ include(SimVascularFunctionCheckCompilerFlags)
 # No objects built directly with project. Not needed!
 #-----------------------------------------------------------------------------
 
+# Optionally build the 1D solver plugin.
+option(SV_USE_ONEDSOLVER "Enable building the 1D solver plugin" ON)
+
+# Optionally build the MITK segmentation plugin
+option(SV_USE_MITK_SEGMENTATION "Enable building the MITK segmentation plugin" ON)
 #-----------------------------------------------------------------------------
 # Externals!
 
-set(SV_EXTERNALS_VERSION_NUMBER "2018.05" CACHE STRING "SimVascular Externals Release Version")
+set(SV_EXTERNALS_VERSION_NUMBER "2019.06" CACHE STRING "SimVascular Externals Release Version")
 mark_as_advanced(SV_EXTERNALS_VERSION_NUMBER)
 
 # Distribution
 option(SV_ENABLE_DISTRIBUTION "Enable Installer Build for SimVascular" OFF)
+
+# sv4gui
+option(SV_USE_SV4_GUI "Enable SV MITK/Qt Based GUI" ON)
 
 if(APPLE)
   option(SV_EXTERNALS_USE_PREBUILT_QT "Use Externally Installed Qt5" OFF)
@@ -102,8 +110,12 @@ elseif(LINUX)
   option(SV_EXTERNALS_USE_PREBUILT_QT "Use Externally Installed Qt5" OFF)
   if(SV_EXTERNALS_VERSION_NUMBER VERSION_EQUAL "2018.01")
     set(SV_EXTERNALS_PREBUILT_QT_PATH "/opt/Qt5.4.2/5.4/gcc_64/lib/cmake/Qt5" CACHE PATH "Qt5 Cmake Config File Path" FORCE)
-  elseif(SV_EXTERNALS_VERSION_NUMBER VERSION_GREATER_EQUAL "2018.05")
-    set(SV_EXTERNALS_PREBUILT_QT_PATH "/opt/Qt5.6.3/5.6.3/gcc_64/lib/cmake/Qt5" CACHE PATH "Qt5 Cmake Config File Path" FORCE)     
+  elseif(SV_EXTERNALS_VERSION_NUMBER VERSION_EQUAL "2018.05")
+    set(SV_EXTERNALS_PREBUILT_QT_PATH "/opt/Qt5.6.3/5.6.3/gcc_64/lib/cmake/Qt5" CACHE PATH "Qt5 Cmake Config File Path" FORCE)
+  elseif(SV_EXTERNALS_VERSION_NUMBER VERSION_EQUAL "2019.02")
+    set(SV_EXTERNALS_PREBUILT_QT_PATH "/opt/Qt5.6.3/5.6.3/gcc_64/lib/cmake/Qt5" CACHE PATH "Qt5 Cmake Config File Path" FORCE)
+  elseif(SV_EXTERNALS_VERSION_NUMBER VERSION_GREATER_EQUAL "2019.06")
+    set(SV_EXTERNALS_PREBUILT_QT_PATH "/opt/Qt5.11.3/5.11.3/gcc_64/lib/cmake/Qt5" CACHE PATH "Qt5 Cmake Config File Path" FORCE)
   else()
     set(SV_EXTERNALS_PREBUILT_QT_PATH "" FORCE)
   endif()
@@ -111,8 +123,12 @@ elseif(WIN32)
   option(SV_EXTERNALS_USE_PREBUILT_QT "Use Externally Installed Qt5" OFF)
   if(SV_EXTERNALS_VERSION_NUMBER VERSION_EQUAL "2018.01")
     set(SV_EXTERNALS_PREBUILT_QT_PATH "C:/OpenSource/Qt/Qt5.4.2/5.4/msvc2013_64_opengl/lib/cmake/Qt5" CACHE PATH "Qt5 Cmake Config File Path")
-  elseif(SV_EXTERNALS_VERSION_NUMBER VERSION_GREATER_EQUAL "2018.05")
-    set(SV_EXTERNALS_PREBUILT_QT_PATH "C:/OpenSource/Qt/Qt5.6.3/5.6.3/msvc2015_64/lib/cmake/Qt5" CACHE PATH "Qt5 Cmake Config File Path")     
+  elseif(SV_EXTERNALS_VERSION_NUMBER VERSION_EQUAL "2018.05")
+    set(SV_EXTERNALS_PREBUILT_QT_PATH "C:/OpenSource/Qt/Qt5.6.3/5.6.3/msvc2015_64/lib/cmake/Qt5" CACHE PATH "Qt5 Cmake Config File Path")
+  elseif(SV_EXTERNALS_VERSION_NUMBER VERSION_EQUAL "2019.02")
+    set(SV_EXTERNALS_PREBUILT_QT_PATH "C:/OpenSource/Qt/Qt5.6.3/5.6.3/msvc2015_64/lib/cmake/Qt5" CACHE PATH "Qt5 Cmake Config File Path")
+  elseif(SV_EXTERNALS_VERSION_NUMBER VERSION_GREATER_EQUAL "2019.06")
+    set(SV_EXTERNALS_PREBUILT_QT_PATH "C:/OpenSource/Qt/Qt5.11.3/5.11.3/msvc2017_64/lib/cmake/Qt5" CACHE PATH "Qt5 Cmake Config File Path")
   else()
     set(SV_EXTERNALS_PREBUILT_QT_PATH "" FORCE)
   endif()
@@ -123,6 +139,16 @@ mark_as_advanced(SV_EXTERNALS_PREBUILT_QT_PATH)
 
 set(SV_EXTERNALS_TOPLEVEL_BIN_DIR "${CMAKE_BINARY_DIR}/Externals-build/svExternals/bin")
 set(SV_EXTERNALS_ADDITIONAL_CMAKE_ARGS "" CACHE STRING "If more options want to be provided to the sv_externals build, they can be with this string")
+
+# Note: only download mitk if needed, but need to download Qt
+# because of VTK dependence regardless
+set(SV_CMAKE_DOWLOAD_MITK_EXTERNAL "ON" CACHE BOOL "Force ON" FORCE)
+if(DEFINED SV_USE_SV4_GUI)
+  if(NOT SV_USE_SV4_GUI)
+    set(SV_CMAKE_DOWLOAD_MITK_EXTERNAL "OFF" CACHE BOOL "Force OFF" FORCE)
+  endif()
+endif()
+
 ExternalProject_Add(Externals
   SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/Externals
   BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/Externals-build
@@ -138,6 +164,7 @@ ExternalProject_Add(Externals
     -DCMAKE_MACOSX_RPATH:BOOL=ON
     -DBUILD_TESTING:BOOL=OFF
     -DBUILD_EXAMPLES:BOOL=OFF
+    -DSV_USE_MITK:BOOL=${SV_CMAKE_DOWLOAD_MITK_EXTERNAL}
     -DSV_EXTERNALS_VERSION_NUMBER:STRING=${SV_EXTERNALS_VERSION_NUMBER}
     -DSV_EXTERNALS_USE_PREBUILT_QT:BOOL=${SV_EXTERNALS_USE_PREBUILT_QT}
     -DSV_EXTERNALS_PREBUILT_QT_PATH:PATH=${SV_EXTERNALS_PREBUILT_QT_PATH}
@@ -189,7 +216,8 @@ ExternalProject_Add(SimVascular
     -DSV_USE_PYTHON:BOOL=ON
     -DSV_USE_Qt5:BOOL=ON
     -DSV_USE_QT:BOOL=ON
-    -DSV_USE_QT_GUI:BOOL=ON
+    -DSV_USE_SV4_GUI:BOOL=${SV_USE_SV4_GUI}
+    -DSV_USE_MITK_SEGMENTATION:BOOL=${SV_USE_MITK_SEGMENTATION}
     -DSV_USE_SOLVERIO:BOOL=ON
     -DSV_USE_TETGEN_ADAPTOR:BOOL=ON
     -DSV_EXTERNALS_USE_TOPLEVEL_BIN_DIR:BOOL=ON

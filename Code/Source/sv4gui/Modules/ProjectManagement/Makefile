@@ -41,6 +41,7 @@ CXXFLAGS = $(GLOBAL_CXXFLAGS) \
            $(PYTHON_INCDIR) \
            $(QT_INCDIRS) $(QT_DEFS) \
 	   $(ITK_INCDIRS) \
+           $(SV_TINYXML_INCDIR) $(SV_TINYXML2_INCDIR) \
            $(MITK_INCDIRS) $(MITK_DEFS)
 
 MODULE_NAME = sv4guiModuleProjectManagement
@@ -58,6 +59,7 @@ HDRS	= \
     sv4gui_ModelFolder.h \
     sv4gui_MeshFolder.h \
     sv4gui_SimulationFolder.h \
+    sv4gui_Simulation1dFolder.h \
     sv4gui_RepositoryFolder.h \
     sv4gui_ProjectManager.h \
     sv4gui_DataNodeOperation.h \
@@ -76,7 +78,8 @@ CXXSRCS	= \
     sv4gui_ProjectFolder.cxx \
     sv4gui_SegmentationFolder.cxx \
     sv4gui_svFSIFolder.cxx \
-    sv4gui_SimulationFolder.cxx
+    sv4gui_SimulationFolder.cxx \
+    sv4gui_Simulation1dFolder.cxx
 
 CXXSRCS += us_init.cxx
 
@@ -105,6 +108,7 @@ DLLLIBS += \
           $(SVLIBFLAG)$(SV_LIB_MODULE_MESH_NAME)$(LIBLINKEXT) \
           $(SVLIBFLAG)$(SV_LIB_MODULE_MODEL_NAME)$(LIBLINKEXT) \
           $(SVLIBFLAG)$(SV_LIB_MODULE_SIMULATION_NAME)$(LIBLINKEXT) \
+          $(SVLIBFLAG)$(SV_LIB_MODULE_SIMULATION1D_NAME)$(LIBLINKEXT) \
           $(SVLIBFLAG)$(SV_LIB_MODULE_PATH_NAME)$(LIBLINKEXT) \
           $(SVLIBFLAG)$(SV_LIB_MODULE_SVFSI_NAME)$(LIBLINKEXT) \
           $(SVLIBFLAG)$(SV_LIB_MODULE_QTWIDGETS_NAME)$(LIBLINKEXT) \
@@ -113,6 +117,14 @@ DLLLIBS += \
           $(SVLIBFLAG)$(SV_LIB_GEOM_NAME)$(LIBLINKEXT) \
           $(SVLIBFLAG)$(SV_LIB_UTILS_NAME)$(LIBLINKEXT) \
           $(SVLIBFLAG)$(SV_LIB_GLOBALS_NAME)$(LIBLINKEXT)
+
+ifeq ($(SV_USE_TINYXML),1)
+  DLLLIBS += $(SV_TINYXML_LIBS)
+endif
+
+ifeq ($(SV_USE_TINYXML2),1)
+  DLLLIBS += $(SV_TINYXML2_LIBS)
+endif
 
 TARGET_LIB_NAME = $(SV_LIB_MODULE_PROJECTMANAGEMENT_NAME)
 

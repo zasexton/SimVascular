@@ -41,6 +41,7 @@ CXXFLAGS = $(GLOBAL_CXXFLAGS) \
            $(PYTHON_INCDIR) \
            $(QT_INCDIRS) $(QT_DEFS) \
 	   $(ITK_INCDIRS) \
+           $(SV_TINYXML_INCDIR) $(SV_TINYXML2_INCDIR) \
            $(MITK_INCDIRS) $(MITK_DEFS) \
            -Dorg_sv_gui_qt_simulation_EXPORTS \
            -DUS_MODULE_NAME=sv4guiModuleSimulation
@@ -54,6 +55,9 @@ HDRS	= \
     sv4gui_TableSolverDelegate.h \
     sv4gui_SimulationView.h \
     sv4gui_SimulationPreferencePage.h \
+    sv4gui_MPIPreferencePage.h \
+    sv4gui_SimulationPreferences.h \
+    sv4gui_MPIPreferences.h \
     sv4gui_SimJobStopAction.h \
     sv4gui_SimJobExportAction.h \
     sv4gui_SimulationPluginActivator.h \
@@ -69,18 +73,27 @@ CXXSRCS	= \
     sv4gui_TableSolverDelegate.cxx \
     sv4gui_SimulationView.cxx \
     sv4gui_SimulationPreferencePage.cxx \
+    sv4gui_MPIPreferencePage.cxx \
+    sv4gui_SimulationPreferences.cxx \
+    sv4gui_MPIPreferences.cxx \
     sv4gui_SimJobStopAction.cxx \
     sv4gui_SimJobExportAction.cxx \
     sv4gui_SimulationPluginActivator.cxx \
     sv4gui_ProcessHandler.cxx \
     sv4gui_SolverProcessHandler.cxx
 
+ifeq ($(SV_USE_WIN32_REGISTRY),1)
+  HDRS += sv4gui_win32_use_registry.h
+  CXXSRCS += sv4gui_win32_use_registry.cxx
+endif
+
 UIFILES = \
     sv4gui_SimJobCreate.ui \
     sv4gui_CapBCWidget.ui \
     sv4gui_SplitBCWidget.ui \
     sv4gui_SimulationPreferencePage.ui \
-    sv4gui_SimulationView.ui
+    sv4gui_SimulationView.ui \
+    sv4gui_MPIPreferencePage.ui
 
 QRCFILES = resources/simulation.qrc
 
@@ -115,6 +128,14 @@ DLLLIBS +=  \
           $(SVLIBFLAG)$(SV_LIB_GEOM_NAME)$(LIBLINKEXT) \
           $(SVLIBFLAG)$(SV_LIB_UTILS_NAME)$(LIBLINKEXT) \
           $(SVLIBFLAG)$(SV_LIB_GLOBALS_NAME)$(LIBLINKEXT)
+
+ifeq ($(SV_USE_TINYXML),1)
+  DLLLIBS += $(SV_TINYXML_LIBS)
+endif
+
+ifeq ($(SV_USE_TINYXML2),1)
+  DLLLIBS += $(SV_TINYXML2_LIBS)
+endif
 
 EXTRA_MOC_INCDIRS = $(MITK_PLUGIN_INCDIRS) -I../org.sv.gui.qt.datamanager
 

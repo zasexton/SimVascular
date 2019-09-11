@@ -44,6 +44,7 @@
 #include <vtkBoxWidget.h>
 
 #include <QWidget>
+#include <QItemSelection>
 
 namespace Ui {
 class sv4guiModelEdit;
@@ -220,6 +221,11 @@ protected:
     bool m_OperatingWholeTableModel;
 
     bool m_LocalOperationforBlendRegion;
+
+private:
+    void SetTimeModified();
+
+
 
 };
 

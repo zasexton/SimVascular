@@ -41,11 +41,13 @@ CXXFLAGS = $(GLOBAL_CXXFLAGS) \
            $(PYTHON_INCDIR) \
            $(QT_INCDIRS) $(QT_DEFS) \
 	   $(ITK_INCDIRS) \
+           $(SV_TINYXML_INCDIR) $(SV_TINYXML2_INCDIR) \
            $(MITK_INCDIRS) $(MITK_DEFS) \
            -Dorg_sv_gui_qt_svfsi_EXPORTS \
            -DUS_MODULE_NAME=sv4guiModulesvFSI
 
 HDRS	= \
+    sv4gui_svFSIJobCreate.h \
     sv4gui_svFSIJobCreateAction.h \
     sv4gui_svFSIUtil.h \
     sv4gui_svFSIView.h \
@@ -54,6 +56,7 @@ HDRS	= \
     sv4gui_svFSIPluginActivator.h
 
 CXXSRCS	= \
+    sv4gui_svFSIJobCreate.cxx \
     sv4gui_svFSIJobCreateAction.cxx \
     sv4gui_svFSIView.cxx \
     sv4gui_svFSIBCWidget.cxx \
@@ -61,6 +64,7 @@ CXXSRCS	= \
     sv4gui_svFSIPluginActivator.cxx
 
 UIFILES = \
+    sv4gui_svFSIJobCreate.ui \
     sv4gui_svFSIView.ui \
     sv4gui_svFSIBCWidget.ui \
     sv4gui_svFSIPreferencePage.ui
@@ -90,6 +94,7 @@ DLLLIBS +=  \
           $(SVLIBFLAG)$(SV_LIB_MODULE_SVFSI_NAME)$(LIBLINKEXT) \
           $(SVLIBFLAG)$(SV_LIB_MODULE_MODEL_NAME)$(LIBLINKEXT) \
           $(SVLIBFLAG)$(SV_LIB_MODULE_MESH_NAME)$(LIBLINKEXT) \
+          $(SVLIBFLAG)$(SV_LIB_MODULE_MODEL_NAME)$(LIBLINKEXT) \
           $(SVLIBFLAG)$(SV_LIB_MODULE_PATH_NAME)$(LIBLINKEXT) \
           $(SVLIBFLAG)$(SV_LIB_MODULE_PROJECTMANAGEMENT_NAME)$(LIBLINKEXT) \
           $(SVLIBFLAG)$(SV_LIB_MODULE_QTWIDGETS_NAME)$(LIBLINKEXT) \
@@ -98,6 +103,14 @@ DLLLIBS +=  \
           $(SVLIBFLAG)$(SV_LIB_GEOM_NAME)$(LIBLINKEXT) \
           $(SVLIBFLAG)$(SV_LIB_UTILS_NAME)$(LIBLINKEXT) \
           $(SVLIBFLAG)$(SV_LIB_GLOBALS_NAME)$(LIBLINKEXT)
+
+ifeq ($(SV_USE_TINYXML),1)
+  DLLLIBS += $(SV_TINYXML_LIBS)
+endif
+
+ifeq ($(SV_USE_TINYXML2),1)
+  DLLLIBS += $(SV_TINYXML2_LIBS)
+endif
 
 EXTRA_MOC_INCDIRS = $(MITK_PLUGIN_INCDIRS) -I../org.sv.gui.qt.datamanager
 

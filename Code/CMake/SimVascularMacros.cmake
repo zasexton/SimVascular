@@ -769,11 +769,16 @@ function(simvascular_create_plugin)
   #------------------------------CREATE PLUGIN--------------------------------
 
   foreach(depender ${_PLUGIN_MODULE_DEPENDS})
-    if(NOT "${depender}" STREQUAL "MitkQtWidgets")
-      target_link_libraries(${lib_name} PRIVATE ${depender})
-    endif()
+      if(SV_USE_MITK_SEGMENTATION)
+        if(NOT (("${depender}" STREQUAL "MitkQtWidgets") OR ("${depender}" STREQUAL "MitkMultilabel")))
+            target_link_libraries(${lib_name} PRIVATE ${depender})
+        endif()
+     else()
+        if(NOT ("${depender}" STREQUAL "MitkQtWidgets") )
+            target_link_libraries(${lib_name} PRIVATE ${depender})
+        endif()
+     endif()
   endforeach()
-
   #---------------------------------MITK DEPENDS-----------------------------
   #simvascular_get_target_libraries(MITK_MODULE_DEPENDS "")
   #message(${MITK_MODULE_DEPENDS})
@@ -812,6 +817,7 @@ function(simvascular_create_plugin)
 endfunction()
 #-----------------------------------------------------------------------------
 
+if(SV_USE_MITK)
 #-----------------------------------------------------------------------------
 function(simvascular_create_module)
 
@@ -886,6 +892,8 @@ function(simvascular_create_module)
 
 endfunction()
 #-----------------------------------------------------------------------------
+endif()
+
 #-----------------------------------------------------------------------------
 #! \ingroup CMakeUtilities
 function(simvascular_extract_option_name_and_value my_opt var_opt_name var_opt_value)
@@ -1129,8 +1137,6 @@ endfunction()
 macro(simvascular_add_new_external proj version use shared dirname)
   option(SV_USE_${proj} "Enable ${proj} Plugin" ${use})
   option(SV_USE_${proj}_SHARED "Build ${proj} libraries as shared libs" ${shared})
-  option(SV_USE_${proj}_QT_GUI "Build ${proj} in the Qt GUI" ${use})
-  mark_as_advanced(SV_USE_${proj}_QT_GUI)
 
   set(${proj}_VERSION "${version}" CACHE TYPE STRING)
   simvascular_get_major_minor_patch_version(${${proj}_VERSION} ${proj}_MAJOR_VERSION ${proj}_MINOR_VERSION ${proj}_PATCH_VERSION)

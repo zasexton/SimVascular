@@ -49,6 +49,8 @@
 #include "sv_arg.h"
 #include "sv_misc_utils.h"
 
+#include "sv_polydatasolid_utils.h"
+//#include "sv4gui_ModelElement.h"
 #include "sv_mmg_mesh_utils.h"
 #include "Python.h"
 
@@ -290,6 +292,108 @@ MeshUtils_remesh_faces(PyObject* self, PyObject* args, PyObject* kwargs)
   return vtkPythonUtil::GetObjectFromPointer(result->GetVtkPolyData());
 }
 
+//------------------------
+// MeshUtils_combine_faces
+//------------------------
+//
+
+PyDoc_STRVAR(MeshUtils_combine_faces_doc,
+" combine_faces(surface,face_ids) \n\
+  \n\
+  Select faces to combine into one polygonal surface using       \n\
+  a list of integer face IDs.                                    \n\
+  \n\
+  The surface must contain a cell data array named 'ModelFaceID' \n\
+  used to identify the set of cells associated with each face.   \n\
+  Surfaces with this data can be obtained from a model created   \n\
+  from the modeling.Modeler() class using the get_polydata()     \n\
+  method.                                                        \n\
+  \n\
+  Args: \n\
+    surface (vtkPolyData): A polygonal surface. \n\
+    face_ids (list[int]):  The list of integer ids identifying   \n\
+                           the faces to combine.                 \n\
+  \n\
+");
+
+static PyObject *
+MeshUtils_combine_faces(PyObject* self,PyObject* args, PyObject* kwargs)
+{
+  auto api = PyUtilApiFunction("OO!", PyRunTimeErr, __func__);
+  static char *keywords[] = {"surface", "face_ids", NULL};
+  PyObject* surfaceArg;
+  PyObject* faceIDsArg;
+
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, api.format, keywords, &surfaceArg, &PyList_Type, &faceIDsArg)) {
+      return api.argsError();
+  }
+
+  //Get the vtkPolyData objects from the Python object.
+  //
+  auto surfPolydata = GetVtkPolyData(api,surfaceArg);
+  if (surfPolydata == nullptr) {
+    return nullptr;
+  }
+  //cvPolyData cv SurfPolydata(surfPolydata);
+  surfPolydata->BuildLinks();
+
+  // Get face IDs.
+  //
+  std::vector<int> faceIDs;
+  int numFaceIDs = PyList_Size(faceIDsArg);
+  if (numFaceIDs == 0) {
+      api.error("The 'face_ids' argument is empty.");
+      return nullptr;
+  }
+  for (int i = 0; i < numFaceIDs; i++) {
+      auto item = PyList_GetItem(faceIDsArg,i);
+      if (!PyLong_Check(item)) {
+          api.error("The 'face_ids' argument is not a list of integers.");
+          return nullptr;
+      }
+      int id = PyLong_AsLong(item);
+      faceIDs.push_back(id);
+      
+  }
+  int targetID = 0;
+  int loseID = 0;
+  for (int i = 0; i < numFaceIDs; i++) {
+      if (i==0) {
+          targetID = faceIDs[i];
+          continue;
+      }
+
+      //std::string markerListName = "ModelFaceID";
+      //int numCells = surfPolydata->GetNumberOfCells();
+      //auto boundaryRegions = vtkIntArray::SafeDownCast(surfPolydata->GetCellData()-> GetScalars(markerListName.c_str()));
+      //auto cellData = vtkIntArray::SafeDownCast(surfPolydata->GetCellData()->GetArray(markerListName.c_str()));
+      //surfPolydata->BuildLinks();
+
+      //for (int cellID = 0; cellID < numCells; cellID++) {
+      //    if (boundaryRegions->GetValue(cellID) == loseID) {
+      //        boundaryRegions->SetValue(cellID,targetID);
+      //    }
+      //}
+      //surfPolydata->GetCellData()->RemoveArray(markerListName.c_str());
+      //boundaryRegions->SetName(markerListName.c_str());
+      //surfPolydata->GetCellData()->AddArray(boundaryRegions);
+      //surfPolydata->GetCellData()->SetActiveScalars(markerListName.c_str());
+      if (PlyDtaUtils_CombineFaces(surfPolydata,targetID,loseID) != SV_OK) {
+          api.error("Combining Faces Failed");
+          return nullptr;
+      }
+  }
+
+  auto result = new cvPolyData(surfPolydata);
+  if (result == NULL) {
+      api.error("Error creating polydata from the combined faces object.");
+      return nullptr;
+  }
+
+  return vtkPythonUtil::GetObjectFromPointer(result->GetVtkPolyData());
+
+}
+
 ////////////////////////////////////////////////////////
 //          M o d u l e  D e f i n i t i o n          //
 ////////////////////////////////////////////////////////
@@ -308,6 +412,7 @@ PyMethodDef PyMeshUtilsMethods[] =
 {
   {"remesh", (PyCFunction)MeshUtils_remesh, METH_VARARGS|METH_KEYWORDS, MeshUtils_remesh_doc},
   {"remesh_faces", (PyCFunction)MeshUtils_remesh_faces, METH_VARARGS|METH_KEYWORDS, MeshUtils_remesh_faces_doc},
+  {"combine_faces", (PyCFunction)MeshUtils_combine_faces, METH_VARARGS|METH_KEYWORDS, MeshUtils_combine_faces_doc},
   {NULL,NULL}
 };
 

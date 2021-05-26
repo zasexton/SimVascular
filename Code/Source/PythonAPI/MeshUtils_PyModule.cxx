@@ -44,10 +44,12 @@
 #include <set>
 #include <stdio.h>
 #include <string.h>
+#include <iostream>
 #include "sv_Repository.h"
 #include "sv_PolyData.h"
 #include "sv_arg.h"
 #include "sv_misc_utils.h"
+#include "sv_vtk_utils.h"
 
 #include "sv_polydatasolid_utils.h"
 //#include "sv4gui_ModelElement.h"
@@ -319,12 +321,13 @@ PyDoc_STRVAR(MeshUtils_combine_faces_doc,
 static PyObject *
 MeshUtils_combine_faces(PyObject* self,PyObject* args, PyObject* kwargs)
 {
-  auto api = PyUtilApiFunction("OO!", PyRunTimeErr, __func__);
-  static char *keywords[] = {"surface", "face_ids", NULL};
+  auto api = PyUtilApiFunction("Oii", PyRunTimeErr, __func__);
+  static char *keywords[] = {"surface", "target", "lose", NULL};
   PyObject* surfaceArg;
-  PyObject* faceIDsArg;
+  int target = 0;
+  int lose = 0;
 
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, api.format, keywords, &surfaceArg, &PyList_Type, &faceIDsArg)) {
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, api.format, keywords, &surfaceArg, &target, &lose)) {
       return api.argsError();
   }
 
@@ -340,11 +343,29 @@ MeshUtils_combine_faces(PyObject* self,PyObject* args, PyObject* kwargs)
   // Get face IDs.
   //
   std::vector<int> faceIDs;
-  int numFaceIDs = PyList_Size(faceIDsArg);
-  if (numFaceIDs == 0) {
-      api.error("The 'face_ids' argument is empty.");
-      return nullptr;
+  std::string markerListName = "ModelFaceID";
+  vtkSmartPointer<vtkIntArray> boundaryRegions = vtkIntArray::SafeDownCast(surfPolydata->GetCellData()->GetScalars(markerListName.c_str()));
+  int numCells = surfPolydata->GetNumberOfCells();
+  //int numFaceIDs = PyList_Size(faceIDsArg);
+  //if (numFaceIDs == 0) {
+  //    api.error("The 'face_ids' argument is empty.");
+  //    return nullptr;
+  //}
+  //int target;
+  //int id1;
+  //int id2;
+  //id1 = *target;
+  //id2 = *lose;
+  //lose = *faceIDs[1];
+  int tmp = 0;
+  for (vtkIdType cellID = 0; cellID < numCells; cellID++) {
+      if (boundaryRegions->GetValue(cellID) == lose) {
+          boundaryRegions->SetValue(cellID,target);
+          //tmp = tmp + 1;
+          //std::cout<<tmp<<std::endl;
+      }
   }
+  /*
   for (int i = 0; i < numFaceIDs; i++) {
       auto item = PyList_GetItem(faceIDsArg,i);
       if (!PyLong_Check(item)) {
@@ -353,7 +374,6 @@ MeshUtils_combine_faces(PyObject* self,PyObject* args, PyObject* kwargs)
       }
       int id = PyLong_AsLong(item);
       faceIDs.push_back(id);
-      
   }
   int targetID = 0;
   int loseID = 0;
@@ -362,7 +382,7 @@ MeshUtils_combine_faces(PyObject* self,PyObject* args, PyObject* kwargs)
           targetID = faceIDs[i];
           continue;
       }
-
+  */
       //std::string markerListName = "ModelFaceID";
       //int numCells = surfPolydata->GetNumberOfCells();
       //auto boundaryRegions = vtkIntArray::SafeDownCast(surfPolydata->GetCellData()-> GetScalars(markerListName.c_str()));
@@ -378,12 +398,15 @@ MeshUtils_combine_faces(PyObject* self,PyObject* args, PyObject* kwargs)
       //boundaryRegions->SetName(markerListName.c_str());
       //surfPolydata->GetCellData()->AddArray(boundaryRegions);
       //surfPolydata->GetCellData()->SetActiveScalars(markerListName.c_str());
-      if (PlyDtaUtils_CombineFaces(surfPolydata,targetID,loseID) != SV_OK) {
-          api.error("Combining Faces Failed");
-          return nullptr;
-      }
-  }
-
+      //if (PlyDtaUtils_CombineFaces(surfPolydata,targetID,loseID) != SV_OK) {
+      //    api.error("Combining Faces Failed");
+      //    return nullptr;
+      //}
+  //}
+  surfPolydata->GetCellData()->RemoveArray(markerListName.c_str());
+  boundaryRegions->SetName(markerListName.c_str());
+  surfPolydata->GetCellData()->AddArray(boundaryRegions);
+  surfPolydata->GetCellData()->SetActiveScalars(markerListName.c_str());
   auto result = new cvPolyData(surfPolydata);
   if (result == NULL) {
       api.error("Error creating polydata from the combined faces object.");
@@ -391,7 +414,7 @@ MeshUtils_combine_faces(PyObject* self,PyObject* args, PyObject* kwargs)
   }
 
   return vtkPythonUtil::GetObjectFromPointer(result->GetVtkPolyData());
-
+  //return 1;
 }
 
 ////////////////////////////////////////////////////////

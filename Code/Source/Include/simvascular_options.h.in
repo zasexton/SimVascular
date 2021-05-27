@@ -62,6 +62,7 @@
 
 #cmakedefine SV_USE_TETGEN @SV_USE_TETGEN@
 #ifdef SV_USE_TETGEN
+  #cmakedefine TETGEN160 @TETGEN160@
   #cmakedefine TETGEN150 @TETGEN150@
   #cmakedefine TETGEN143 @TETGEN143@
   #cmakedefine TETGEN151 @TETGEN151@

@@ -1645,7 +1645,7 @@ int cvTetGenMeshObject::GenerateMesh() {
       tgb->varvolume = 1;
       tgb->regionattrib = 1;
     }
-#if defined(TETGEN150) || defined(TETGEN151)
+#if defined(TETGEN150) || defined(TETGEN151) || defined(TETGEN160)
     if (meshoptions_.coarsenpercent != 0)
     {
       tgb->coarsen=1;

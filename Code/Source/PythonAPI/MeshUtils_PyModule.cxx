@@ -52,7 +52,6 @@
 #include "sv_vtk_utils.h"
 
 #include "sv_polydatasolid_utils.h"
-//#include "sv4gui_ModelElement.h"
 #include "sv_mmg_mesh_utils.h"
 #include "Python.h"
 
@@ -303,7 +302,7 @@ PyDoc_STRVAR(MeshUtils_combine_faces_doc,
 " combine_faces(surface,face_ids) \n\
   \n\
   Select faces to combine into one polygonal surface using       \n\
-  a list of integer face IDs.                                    \n\
+  a target face id and loss face id.                             \n\
   \n\
   The surface must contain a cell data array named 'ModelFaceID' \n\
   used to identify the set of cells associated with each face.   \n\
@@ -313,8 +312,11 @@ PyDoc_STRVAR(MeshUtils_combine_faces_doc,
   \n\
   Args: \n\
     surface (vtkPolyData): A polygonal surface. \n\
-    face_ids (list[int]):  The list of integer ids identifying   \n\
-                           the faces to combine.                 \n\
+    target_id       (int): The integer identifying the face to   \n\
+                           combine into.                         \n\
+    lose_id         (int): The integer identifying the face to   \n\
+                           be overwritten and combined into the  \n\
+                           target face.                          \n\
   \n\
 ");
 
@@ -340,73 +342,25 @@ MeshUtils_combine_faces(PyObject* self,PyObject* args, PyObject* kwargs)
   //cvPolyData cv SurfPolydata(surfPolydata);
   surfPolydata->BuildLinks();
 
-  // Get face IDs.
-  //
+  // Identify cells belonging to the region to be combined.
+  // Reassign the region label to the target region.
+
   std::vector<int> faceIDs;
   std::string markerListName = "ModelFaceID";
   vtkSmartPointer<vtkIntArray> boundaryRegions = vtkIntArray::SafeDownCast(surfPolydata->GetCellData()->GetScalars(markerListName.c_str()));
   int numCells = surfPolydata->GetNumberOfCells();
-  //int numFaceIDs = PyList_Size(faceIDsArg);
-  //if (numFaceIDs == 0) {
-  //    api.error("The 'face_ids' argument is empty.");
-  //    return nullptr;
-  //}
-  //int target;
-  //int id1;
-  //int id2;
-  //id1 = *target;
-  //id2 = *lose;
-  //lose = *faceIDs[1];
-  int tmp = 0;
   for (vtkIdType cellID = 0; cellID < numCells; cellID++) {
       if (boundaryRegions->GetValue(cellID) == lose) {
           boundaryRegions->SetValue(cellID,target);
-          //tmp = tmp + 1;
-          //std::cout<<tmp<<std::endl;
       }
   }
-  /*
-  for (int i = 0; i < numFaceIDs; i++) {
-      auto item = PyList_GetItem(faceIDsArg,i);
-      if (!PyLong_Check(item)) {
-          api.error("The 'face_ids' argument is not a list of integers.");
-          return nullptr;
-      }
-      int id = PyLong_AsLong(item);
-      faceIDs.push_back(id);
-  }
-  int targetID = 0;
-  int loseID = 0;
-  for (int i = 0; i < numFaceIDs; i++) {
-      if (i==0) {
-          targetID = faceIDs[i];
-          continue;
-      }
-  */
-      //std::string markerListName = "ModelFaceID";
-      //int numCells = surfPolydata->GetNumberOfCells();
-      //auto boundaryRegions = vtkIntArray::SafeDownCast(surfPolydata->GetCellData()-> GetScalars(markerListName.c_str()));
-      //auto cellData = vtkIntArray::SafeDownCast(surfPolydata->GetCellData()->GetArray(markerListName.c_str()));
-      //surfPolydata->BuildLinks();
-
-      //for (int cellID = 0; cellID < numCells; cellID++) {
-      //    if (boundaryRegions->GetValue(cellID) == loseID) {
-      //        boundaryRegions->SetValue(cellID,targetID);
-      //    }
-      //}
-      //surfPolydata->GetCellData()->RemoveArray(markerListName.c_str());
-      //boundaryRegions->SetName(markerListName.c_str());
-      //surfPolydata->GetCellData()->AddArray(boundaryRegions);
-      //surfPolydata->GetCellData()->SetActiveScalars(markerListName.c_str());
-      //if (PlyDtaUtils_CombineFaces(surfPolydata,targetID,loseID) != SV_OK) {
-      //    api.error("Combining Faces Failed");
-      //    return nullptr;
-      //}
-  //}
+  // Redefine the new boundary regions for the Polydata object
   surfPolydata->GetCellData()->RemoveArray(markerListName.c_str());
   boundaryRegions->SetName(markerListName.c_str());
   surfPolydata->GetCellData()->AddArray(boundaryRegions);
   surfPolydata->GetCellData()->SetActiveScalars(markerListName.c_str());
+
+  // Create the new polydata object for an output value
   auto result = new cvPolyData(surfPolydata);
   if (result == NULL) {
       api.error("Error creating polydata from the combined faces object.");
@@ -414,7 +368,6 @@ MeshUtils_combine_faces(PyObject* self,PyObject* args, PyObject* kwargs)
   }
 
   return vtkPythonUtil::GetObjectFromPointer(result->GetVtkPolyData());
-  //return 1;
 }
 
 ////////////////////////////////////////////////////////

@@ -94,7 +94,9 @@ static struct PyModuleDef pyMeshTetgenmodule = {
 PyObject* Tetgenmesh_pyInit()
 {
 
-#ifdef TETGEN151
+#ifdef TETGEN160
+  printf("  %-12s %s\n","TetGen:", "1.6.0");
+#elif TETGEN151
   printf("  %-12s %s\n","TetGen:", "1.5.1");
 #elif TETGEN150
   printf("  %-12s %s\n","TetGen:", "1.5.0");
@@ -142,7 +144,9 @@ PyMODINIT_FUNC
 initpyMeshTetgen(void)
 {
 
-#ifdef TETGEN151
+#ifdef TETGEN160
+  printf("  %-12s %s\n","TetGen:", "1.6.0");
+#elif TETGEN151
   printf("  %-12s %s\n","TetGen:", "1.5.1");
 #elif TETGEN150
   printf("  %-12s %s\n","TetGen:", "1.5.0");
@@ -188,7 +192,9 @@ PyMODINIT_FUNC
 PyInit_pyMeshTetgen(void)
 {
 
-#ifdef TETGEN151
+#ifdef TETGEN160
+  printf("  %-12s %s\n","TetGen:", "1.6.0");
+#elif TETGEN151
   printf("  %-12s %s\n","TetGen:", "1.5.1");
 #elif TETGEN150
   printf("  %-12s %s\n","TetGen:", "1.5.0");

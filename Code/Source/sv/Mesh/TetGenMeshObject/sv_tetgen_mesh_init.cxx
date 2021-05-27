@@ -74,7 +74,9 @@ int TetGenMesh_AvailableCmd( ClientData clientData, Tcl_Interp *interp,
 int Tetgenmesh_Init( Tcl_Interp *interp )
 {
 
-#ifdef TETGEN151
+#ifdef TETGEN160
+  printf("  %-12s %s\n","TetGen:", "1.6.0");
+#elif TETGEN151
   printf("  %-12s %s\n","TetGen:", "1.5.1");
 #elif TETGEN150
   printf("  %-12s %s\n","TetGen:", "1.5.0");

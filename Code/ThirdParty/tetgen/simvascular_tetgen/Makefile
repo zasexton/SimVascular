@@ -1,34 +1,61 @@
-# Hey emacs, this is a -*- makefile -*-
+###############################################################################
+#                                                                             #
+# makefile for TetGen                                                         #
+#                                                                             #
+# Type "make" to compile TetGen into an executable program (tetgen).          #
+# Type "make tetlib" to compile TetGen into a library (libtet.a).             #
+# Type "make distclean" to delete all object (*.o) files.                     #
+#                                                                             #
+###############################################################################
 
-# Copyright (c) Stanford University, The Regents of the University of
-#               California, and others.
+# CXX should be set to the name of your favorite C++ compiler.
+# ===========================================================
+
+#CXX = g++
+#CXX = icpc
+#CXX = CC
+
+# CXXFLAGS is the level of optimiztion, default is -O. One should try
+# -O2, -O3 ... to find the best optimization level.
+# ===================================================================
+
+#CXXFLAGS = -O3
+
+# PREDCXXFLAGS is for compiling J. Shewchuk's predicates. 
+
+#PREDCXXFLAGS = -O0
+
+# SWITCHES is a list of switches to compile TetGen.
+# =================================================
 #
-# All Rights Reserved.
+# By default, TetGen uses double precision floating point numbers.  If you
+#   prefer single precision, use the -DSINGLE switch. 
 #
-# See Copyright-SimVascular.txt for additional details.
-#
-# Permission is hereby granted, free of charge, to any person obtaining
-# a copy of this software and associated documentation files (the
-# "Software"), to deal in the Software without restriction, including
-# without limitation the rights to use, copy, modify, merge, publish,
-# distribute, sublicense, and/or sell copies of the Software, and to
-# permit persons to whom the Software is furnished to do so, subject
-# to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included
-# in all copies or substantial portions of the Software.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
-# IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
-# TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
-# PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
-# OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# The source code of TetGen includes a lot of assertions, which are mainly
+#   used for catching bugs at that places.  These assertions somewhat slow
+#   down the speed of TetGen.  They can be skipped by define the -DNDEBUG
+#   switch.
+
+#SWITCHES = 
+
+# RM should be set to the name of your favorite rm (file deletion program).
+
+#RM = /bin/rm
+
+# The action starts here.
+
+#tetgen:	tetgen.cxx predicates.o
+#	$(CXX) $(CXXFLAGS) $(SWITCHES) -o tetgen tetgen.cxx predicates.o -lm
+
+#tetlib: tetgen.cxx predicates.o
+#	$(CXX) $(CXXFLAGS) $(SWITCHES) -DTETLIBRARY -c tetgen.cxx
+#	ar r libtet.a tetgen.o predicates.o
+
+#predicates.o: predicates.cxx
+#	$(CXX) $(PREDCXXFLAGS) -c predicates.cxx
+
+#clean:
+#	$(RM) *.o *.a tetgen *~
 
 TOP=../../../../BuildWithMake
 
@@ -36,9 +63,9 @@ include $(TOP)/include.mk
 
 CXXFLAGS = $(GLOBAL_CXXFLAGS) $(LOCAL_INCDIR)
 
-HDRS	= tetgen.h
+HDRS     = tetgen.h
 
-CXXSRCS	= predicates.cxx tetgen.cxx
+CXXSRCS  = predicates.cxx tetgen.cxx
 
 TARGET_LIB_NAME = $(SV_LIB_THIRDPARTY_TETGEN_NAME)
 

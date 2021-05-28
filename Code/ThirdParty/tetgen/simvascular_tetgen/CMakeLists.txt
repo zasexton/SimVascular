@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 2.6)
 project(TETGEN)
 ### SIMVASCULAR_CHANGE
 set (lib ${SV_LIB_THIRDPARTY_TETGEN_NAME})
-if(SV_USE_THIRDPARTY_SHARED_TETGEN_NAME)
+if(SV_USE_THIRDPARTY_SHARED_TETGEN_LIBRARIES)
   add_library(${lib} SHARED tetgen.cxx predicates.cxx)
 else()
   add_library(${lib} SHARED tetgen.cxx predicates.cxx)
@@ -22,10 +22,10 @@ endif()
 set_target_properties(${lib} PROPERTIES "COMPILE_DEFINITIONS" TETLIBRARY)
 
 if(SV_INSTALL_LIBS)
-	install(TARGET ${lib}
+	install(TARGETS ${lib}
 		RUNTIME DESTINATION ${SV_INSTALL_RUNTIME_DIR} COMPONENT ThirdPartyExecutables
 		LIBRARY DESTINATION ${SV_INSTALL_LIBRARY_DIR} COMPONENT ThirdPartyLibraries
-		ARCHIVE DESTINATION ${SV_INSTALL_LIBRARY_DIR} COMPONENT ThirdPartyLibraries
+		ARCHIVE DESTINATION ${SV_INSTALL_ARCHIVE_DIR} COMPONENT ThirdPartyLibraries
 		)
 endif()
 if(SV_INSTALL_HEADERS)

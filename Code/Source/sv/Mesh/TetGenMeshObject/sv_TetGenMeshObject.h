@@ -67,7 +67,7 @@ class SV_EXPORT_TETGEN_MESH cvTetGenMeshObject : public cvMeshObject {
     int verbose;
     int diagnose;
     int nobisect;
-    int optlevel;
+    int opt_max_flip_level;
     double maxedgesize;
     double epsilon;
     double minratio;

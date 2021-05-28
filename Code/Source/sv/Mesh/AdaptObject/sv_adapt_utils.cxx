@@ -1349,20 +1349,20 @@ int AdaptUtils_convertToVTK(vtkUnstructuredGrid *mesh,vtkPolyData *surfaceMesh,t
 
     adaptFaces->InsertNextCell(facePointIds);
 
-    if (outmesh->adjtetlist[2*i] >= numAdaptTets || outmesh->adjtetlist[2*i] <= 0)
+    if (outmesh->face2tetlist[2*i] >= numAdaptTets || outmesh->face2tetlist[2*i] <= 0)
     {
-      vtpAdaptFaceIds->InsertValue(i,adaptGlobalElementIds->GetValue(outmesh->adjtetlist[2*i+1]));
+      vtpAdaptFaceIds->InsertValue(i,adaptGlobalElementIds->GetValue(outmesh->face2tetlist[2*i+1]));
       count++;
     }
-    else if (outmesh->adjtetlist[2*i+1] >= numAdaptTets || outmesh->adjtetlist[2*i+1] <= 0)
+    else if (outmesh->face2tetlist[2*i+1] >= numAdaptTets || outmesh->face2tetlist[2*i+1] <= 0)
     {
-      vtpAdaptFaceIds->InsertValue(i,adaptGlobalElementIds->GetValue(outmesh->adjtetlist[2*i]));
+      vtpAdaptFaceIds->InsertValue(i,adaptGlobalElementIds->GetValue(outmesh->face2tetlist[2*i]));
       count++;
     }
 
     else
     {
-      vtpAdaptFaceIds->InsertValue(i,adaptGlobalElementIds->GetValue(outmesh->adjtetlist[2*i+1]));
+      vtpAdaptFaceIds->InsertValue(i,adaptGlobalElementIds->GetValue(outmesh->face2tetlist[2*i+1]));
     }
   }
 

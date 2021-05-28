@@ -852,7 +852,7 @@ endif
 
 ifeq ($(SV_USE_TETGEN),1)
   SV_LIB_THIRDPARTY_TETGEN_NAME=_simvascular_thirdparty_tetgen
-  TETGEN150       = 1
+  TETGEN160       = 1
   GLOBAL_DEFINES += -DTETLIBRARY
   THIRD_PARTY_LIBDIRS += ../Code/ThirdParty/tetgen
   TETGEN_TOP = $(TOP)/../Code/ThirdParty/tetgen

@@ -123,7 +123,7 @@ cvTetGenMeshObject::cvTetGenMeshObject(Tcl_Interp *interp)
   meshoptions_.verbose=0;
   meshoptions_.diagnose=0;
   meshoptions_.nobisect=0;
-  meshoptions_.optlevel=0;
+  meshoptions_.opt_max_flip_level=0;
   meshoptions_.maxedgesize=0;
   meshoptions_.epsilon=0;
   meshoptions_.minratio=0;
@@ -209,7 +209,7 @@ cvTetGenMeshObject::cvTetGenMeshObject()
   meshoptions_.verbose=0;
   meshoptions_.diagnose=0;
   meshoptions_.nobisect=0;
-  meshoptions_.optlevel=0;
+  meshoptions_.opt_max_flip_level=0;
   meshoptions_.maxedgesize=0;
   meshoptions_.epsilon=0;
   meshoptions_.minratio=0;
@@ -1148,7 +1148,7 @@ int cvTetGenMeshObject::SetMeshOptions(char *flags,int numValues,double *values)
   else if(!strncmp(flags,"Optimization",12)) {//O
     if (numValues < 1)
       return SV_ERROR;
-    meshoptions_.optlevel=(int)values[0];
+    meshoptions_.opt_max_flip_level=(int)values[0];
   }
   else if(!strncmp(flags,"Epsilon",7)) {//T
     if (numValues < 1)
@@ -1568,7 +1568,7 @@ int cvTetGenMeshObject::GenerateMesh() {
   if (meshoptions_.volumemeshflag)
   {
     tetgenbehavior* tgb = new tetgenbehavior;
-    //Default flags: plc and neihgborlist/adjtetlist output
+    //Default flags: plc and neihgborlist/face2tetlist output
     tgb->plc=1;
     tgb->neighout=2;
 
@@ -1592,9 +1592,9 @@ int cvTetGenMeshObject::GenerateMesh() {
       tgb->mindihedral = meshoptions_.mindihedral;
     }
 
-    if (meshoptions_.optlevel != 0)
+    if (meshoptions_.opt_max_flip_level != 0)
     {
-      tgb->optlevel=meshoptions_.optlevel;
+      tgb->opt_max_flip_level=meshoptions_.opt_max_flip_level;
     }
     if (meshoptions_.epsilon != 0)
     {

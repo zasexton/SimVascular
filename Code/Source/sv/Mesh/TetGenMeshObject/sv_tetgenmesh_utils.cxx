@@ -496,18 +496,18 @@ int TGenUtils_ConvertToVTK(tetgenio *outmesh,vtkUnstructuredGrid *volumemesh,vtk
 
     faces->InsertNextCell(facePointIds);
 
-    if (!(outmesh->adjtetlist[2*i] >= numPolys || outmesh->adjtetlist[2*i] < 0))
+    if (!(outmesh->face2tetlist[2*i] >= numPolys || outmesh->face2tetlist[2*i] < 0))
     {
-      vtpFaceIds->InsertValue(i,globalElementIds->GetValue(outmesh->adjtetlist[2*i]));
+      vtpFaceIds->InsertValue(i,globalElementIds->GetValue(outmesh->face2tetlist[2*i]));
     }
-    else if (!(outmesh->adjtetlist[2*i+1] >= numPolys || outmesh->adjtetlist[2*i+1] < 0))
+    else if (!(outmesh->face2tetlist[2*i+1] >= numPolys || outmesh->face2tetlist[2*i+1] < 0))
     {
-      vtpFaceIds->InsertValue(i,globalElementIds->GetValue(outmesh->adjtetlist[2*i+1]));
+      vtpFaceIds->InsertValue(i,globalElementIds->GetValue(outmesh->face2tetlist[2*i+1]));
     }
     else
     {
       fprintf(stderr,"WARNING: TetGen says face has no adjacent tetrahedron\n");
-      vtpFaceIds->InsertValue(i,globalElementIds->GetValue(outmesh->adjtetlist[2*i+1]));
+      vtpFaceIds->InsertValue(i,globalElementIds->GetValue(outmesh->face2tetlist[2*i+1]));
     }
 
     if (getBoundary)

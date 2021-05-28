@@ -4,7 +4,9 @@
 
 ###############################################################################
 
-CXX = g++ #CXX = icpc #CXX = CC
+CXX = g++
+#CXX = icpc
+#CXX = CC
 
 CXXFLAGS = -O3
 
@@ -18,11 +20,15 @@ SWITCHES =
 
 RM = /bin/rm
 
-tetgen: tetgen.cxx predicates.o $(CXX) $(CXXFLAGS) $(SWITCHES) -o tetgen tetgen.cxx predicates.o -lm
+tetgen: tetgen.cxx predicates.o 
+        $(CXX) $(CXXFLAGS) $(SWITCHES) -o tetgen tetgen.cxx predicates.o -lm
 
-tetlib: tetgen.cxx predicates.o $(CXX) $(CXXFLAGS) $(SWITCHES) -DTETLIBRARY -c tetgen.cxx ar r libtet.a tetgen.o predicates.o
+tetlib: tetgen.cxx predicates.o
+        $(CXX) $(CXXFLAGS) $(SWITCHES) -DTETLIBRARY -c tetgen.cxx
+        ar r libtet.a tetgen.o predicates.o
 
-predicates.o: predicates.cxx $(CXX) $(PREDCXXFLAGS) -c predicates.cxx
+predicates.o: predicates.cxx
+        $(CXX) $(PREDCXXFLAGS) -c predicates.cxx
 
 clean: $(RM) *.o *.a tetgen *~
 

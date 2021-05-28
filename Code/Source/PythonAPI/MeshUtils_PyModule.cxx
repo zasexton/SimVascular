@@ -274,7 +274,7 @@ MeshUtils_remesh_faces(PyObject* self, PyObject* args, PyObject* kwargs)
   //
   int meshCaps = 1;
   int preserveEdges = 0;
-  double collapseAngleThreshold = 0;
+  double collapseAngleThreshold = 0.45;
   double triangleSplitFactor = 0;
   int useSizeFunction = 0;
 

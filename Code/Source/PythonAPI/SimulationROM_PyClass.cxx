@@ -117,7 +117,8 @@ namespace ROMSim_Parameters {
 
   static const char* MODEL_ORDER = "model_order";
   static const char* PYTHON_ROM_SIMULATION_MODULE_NAME = "sv_rom_simulation";
-  static const char* SOLVER_FILE_NAME = "solver.in"; 
+  static const char *SOLVER_0D_FILE_NAME = "solver_0d.in";
+  static const char *SOLVER_1D_FILE_NAME = "solver_1d.in";
 }
 
 //----------------------
@@ -419,14 +420,16 @@ ROMSim_AddModelParameters(sv4guiROMSimulationPython& pythonInterface, PyObject* 
 // Add solution paramaters. 
 //
 void
-ROMSim_AddSolutionParameters(sv4guiROMSimulationPython& pythonInterface, PyObject* solutionObj)
+ROMSim_AddSolutionParameters(sv4guiROMSimulationPython& pythonInterface, PyObject* solutionObj, const int modelOrder)
 {
   using namespace ROMSim_Parameters;
   auto params = pythonInterface.m_ParameterNames;
 
   // Add the name of the solver input file.
-  auto solverFileName = ROMSim_Parameters::SOLVER_FILE_NAME;
-  pythonInterface.AddParameter(params.SOLVER_OUTPUT_FILE, solverFileName);
+  if (modelOrder == 0)
+	  pythonInterface.AddParameter(params.SOLVER_OUTPUT_FILE, ROMSim_Parameters::SOLVER_0D_FILE_NAME);
+  else if (modelOrder == 1)
+	  pythonInterface.AddParameter(params.SOLVER_OUTPUT_FILE, ROMSim_Parameters::SOLVER_1D_FILE_NAME);
 
   auto numTimeSteps = PyUtilGetIntAttr(solutionObj, SOLUTION_NUM_TIME_STEPS);
   pythonInterface.AddParameter(params.NUM_TIME_STEPS, std::to_string(numTimeSteps));
@@ -610,7 +613,7 @@ ROMSim_write_input_file(PySimulationROM* self, PyObject* args, PyObject* kwargs)
       ROMSim_AddFluidParameters(pythonInterface, fluidPropsArg);
       ROMSim_AddMaterialParameters(pythonInterface, materialModelArg);
       ROMSim_AddBoundaryConditionParameters(pythonInterface, bcsParamsArg, outputDir);
-      ROMSim_AddSolutionParameters(pythonInterface, solutionParamsArg);
+      ROMSim_AddSolutionParameters(pythonInterface, solutionParamsArg, modelOrder);
       ROMSim_GenerateSolverInput(pythonInterface, outputDir);
 
   } catch (const std::exception& exception) {

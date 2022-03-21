@@ -82,8 +82,11 @@ using namespace std;
 
 const QString sv4guiSeg2DEdit::EXTENSION_ID = "org.sv.views.segmentation2d";
 
-sv4guiSeg2DEdit::sv4guiSeg2DEdit() :
-    ui(new Ui::sv4guiSeg2DEdit)
+//-----------------
+// sv4guiSeg2DEdit
+//-----------------
+//
+sv4guiSeg2DEdit::sv4guiSeg2DEdit() : ui(new Ui::sv4guiSeg2DEdit)
 {
     m_ContourGroupChangeObserverTag=-1;
     m_ContourGroup=NULL;
@@ -128,6 +131,11 @@ sv4guiSeg2DEdit::~sv4guiSeg2DEdit()
         delete m_ContourGroupCreateWidget;
 }
 
+//---------------------
+// CreateQtPartControl
+//---------------------
+// Setup and initialize GUI controls.
+//
 void sv4guiSeg2DEdit::CreateQtPartControl( QWidget *parent )
 {
     m_Parent=parent;
@@ -262,10 +270,19 @@ int sv4guiSeg2DEdit::GetTimeStep()
 
 }
 
+//--------------------
+// OnSelectionChanged
+//--------------------
+// This is called any control in the Data Manager is selected.
+//
+// Lots of data is set here:
+//
+//   m_Image
+//
 void sv4guiSeg2DEdit::OnSelectionChanged(std::vector<mitk::DataNode*> nodes )
 {
+    std::cout << "OnSelectionChanged\n";
 
-//    if(!IsActivated())
     if(!IsVisible())
     {
         return;
@@ -313,22 +330,19 @@ void sv4guiSeg2DEdit::OnSelectionChanged(std::vector<mitk::DataNode*> nodes )
     mitk::DataStorage::SetOfObjects::ConstPointer rs=GetDataStorage()->GetSources (m_ContourGroupNode,isProjFolder,false);
 
     m_PathNode=NULL;
-    if(rs->size()>0)
-    {
+
+    if(rs->size()>0) {
         mitk::DataNode::Pointer projFolderNode=rs->GetElement(0);
 
         rs=GetDataStorage()->GetDerivations (projFolderNode,mitk::NodePredicateDataType::New("sv4guiImageFolder"));
-        if(rs->size()>0)
-        {
-
+        if(rs->size()>0) {
             mitk::DataNode::Pointer imageFolderNode=rs->GetElement(0);
             rs=GetDataStorage()->GetDerivations(imageFolderNode);
-//            if(rs->size()<1) return;
-            if(rs->size()>0)
-            {
+            if(rs->size()>0) {
                 imageNode=rs->GetElement(0);
-                if(imageNode.IsNotNull())
+                if(imageNode.IsNotNull()) {
                     m_Image= dynamic_cast<mitk::Image*>(imageNode->GetData());
+                }
             }
 
         }
@@ -762,21 +776,26 @@ void sv4guiSeg2DEdit::CreateContours(SegmentationMethod method)
 //            ui->resliceSlider->setSlicePos(posID);
         }
 
-        sv4guiContour* contour=NULL;
+        sv4guiContour* contour = NULL;
 
-        switch(method)
-        {
-            case LEVELSET_METHOD:
-            {
+        auto pathPoint = ui->resliceSlider->getPathPoint(posID);
+        auto imageVolume = m_cvImage->GetVtkStructuredPoints(); 
+        auto sliceSize = ui->resliceSlider->getResliceSize();
+        auto imageTransform = sv4guiSegmentationUtils::GetImageTransformation(m_Image);
+
+        switch(method) {
+            case LEVELSET_METHOD: {
                 sv4guiSegmentationUtils::svLSParam tmpLSParam = m_LSParamWidget->GetLSParam();
-                contour=sv4guiSegmentationUtils::CreateLSContour(ui->resliceSlider->getPathPoint(posID),m_cvImage->GetVtkStructuredPoints(),&tmpLSParam,ui->resliceSlider->getResliceSize());
+                contour = sv4guiSegmentationUtils::CreateLSContour(pathPoint, imageVolume, &tmpLSParam, sliceSize, imageTransform); 
                 break;
             }
-            case THRESHOLD_METHOD:
-                contour=sv4guiSegmentationUtils::CreateThresholdContour(ui->resliceSlider->getPathPoint(posID),m_cvImage->GetVtkStructuredPoints(),ui->sliderThreshold->value(), ui->resliceSlider->getResliceSize());
+            case THRESHOLD_METHOD: {
+                auto thresholdValue = ui->sliderThreshold->value();
+                contour = sv4guiSegmentationUtils::CreateThresholdContour(pathPoint, imageVolume, thresholdValue, sliceSize, imageTransform);
                 break;
+            }
             case ML_METHOD:
-                contour=doMLContour(ui->resliceSlider->getPathPoint(posID));
+                contour = doMLContour(pathPoint);
                 break;
             default:
                 break;
@@ -1754,29 +1773,43 @@ void sv4guiSeg2DEdit::ShowPath(bool checked)
 //---------------------------
 // PreparePreviewInteraction
 //---------------------------
-// Create an image slice used for threshold image segmentation.
+// Setup data structures for interacting with 2D view to select a threshold value.
+//
+// This extractd a slice from the image volume used for threshold image segmentation.
 //
 void sv4guiSeg2DEdit::PreparePreviewInteraction(QString method)
 {
-    m_PreviewContourModel = sv4guiContourModel::New();
+    //std::cout << "========== sv4guiSeg2DEdit::PreparePreviewInteraction ========== " << std::endl;
 
+    // Create Data Node to show threshold contour.
+    m_PreviewContourModel = sv4guiContourModel::New();
     m_PreviewDataNode = mitk::DataNode::New();
     m_PreviewDataNode->SetData(m_PreviewContourModel);
     m_PreviewDataNode->SetName("PreviewContour");
     m_PreviewDataNode->SetBoolProperty("helper object", true);
-
     GetDataStorage()->Add(m_PreviewDataNode, m_ContourGroupNode);
 
-    m_PreviewDataNodeInteractor= sv4guiContourModelThresholdInteractor::New();
-    m_PreviewDataNodeInteractor->LoadStateMachine("sv4gui_ContourModelThresholdInteraction.xml", us::ModuleRegistry::GetModule("sv4guiModuleSegmentation"));
+    // Create an interactor used to select a threshold value.
+    m_PreviewDataNodeInteractor = sv4guiContourModelThresholdInteractor::New();
+    m_PreviewDataNodeInteractor->LoadStateMachine("sv4gui_ContourModelThresholdInteraction.xml", 
+       us::ModuleRegistry::GetModule("sv4guiModuleSegmentation"));
     m_PreviewDataNodeInteractor->SetEventConfig("sv4gui_SegmentationConfig.xml", us::ModuleRegistry::GetModule("sv4guiModuleSegmentation"));
     m_PreviewDataNodeInteractor->SetDataNode(m_PreviewDataNode);
-
-    cvStrPts*  strPts=sv4guiSegmentationUtils::GetSlicevtkImage(ui->resliceSlider->getCurrentPathPoint(), m_cvImage->GetVtkStructuredPoints(), ui->resliceSlider->getResliceSize());
     m_PreviewDataNodeInteractor->SetVtkImageData(m_cvImage->GetVtkStructuredPoints());
     m_PreviewDataNodeInteractor->SetPathPoint(ui->resliceSlider->getCurrentPathPoint());
     m_PreviewDataNodeInteractor->SetGroupInteractor(m_DataInteractor);
 
+    // Get the mitk itk image transformation needed to transform 
+    // the 2D image slices definded from path data.
+    auto imageTransform = sv4guiSegmentationUtils::GetImageTransformation(m_Image);
+    m_PreviewDataNodeInteractor->SetImageTransform(imageTransform);
+
+    // Extract a slice from the image volume.
+    auto pathPoint = ui->resliceSlider->getCurrentPathPoint();
+    int sliceSize = ui->resliceSlider->getResliceSize();
+    cvStrPts* strPts = sv4guiSegmentationUtils::GetSlicevtkImage(pathPoint, m_cvImage->GetVtkStructuredPoints(), sliceSize, imageTransform);
+
+    // Setup callbacks when finishing interactive selection?
     itk::SimpleMemberCommand<sv4guiSeg2DEdit>::Pointer previewFinished = itk::SimpleMemberCommand<sv4guiSeg2DEdit>::New();
     previewFinished->SetCallbackFunction(this, &sv4guiSeg2DEdit::FinishPreview);
     m_PreviewContourModelObserverFinishTag = m_PreviewContourModel->AddObserver( EndInteractionContourModelEvent(), previewFinished);
@@ -1894,13 +1927,13 @@ void sv4guiSeg2DEdit::setupMLui(){
 }
 
 void sv4guiSeg2DEdit::segTabSelected(){
-  std::cout << "select seg tab\n";
+  //std::cout << "select seg tab\n";
   ////remove_toolbox   switch(ui->segToolbox->currentIndex()){
   ////remove_toolbox   case 1:
   ////remove_toolbox   break;
 
   ////remove_toolbox   case 0:
-      std::cout << "single path selected\n";
+      //std::cout << "single path selected\n";
       if(!m_ContourGroup)
       {
           ui->resliceSlider->turnOnReslice(false);
@@ -1921,7 +1954,9 @@ void sv4guiSeg2DEdit::segTabSelected(){
  * and sets the image volume path.
  *
  */
-void sv4guiSeg2DEdit::initialize(){
+void sv4guiSeg2DEdit::initialize()
+{
+  std::cout << "========== sv4guiSeg2DEdit::initialize ==========" << std::endl;
   bool ml_init;
   GetDataStorage()->GetNamedNode("Segmentations")->GetBoolProperty("ml_init",ml_init);
 
@@ -1933,67 +1968,35 @@ void sv4guiSeg2DEdit::initialize(){
   mitk::NodePredicateDataType::Pointer isProjFolder = mitk::NodePredicateDataType::New("sv4guiProjectFolder");
   mitk::DataNode::Pointer projFolderNode = GetDataStorage()->GetNode (isProjFolder);
 
+  if (!projFolderNode) {
+    return;
+  }
 
-  if (projFolderNode){
-    std::string projPath;
-    projFolderNode->GetStringProperty("project path", projPath);
+  std::string projPath;
+  projFolderNode->GetStringProperty("project path", projPath);
+  std::cout << "[initialize] projPath: " << projPath << std::endl;
+  mitk::DataNode::Pointer imageNode;
 
-    QString QprojPath = QString(projPath.c_str());
-
-    QDir dir(QprojPath);
-
-    QString projectConfigFileName=".svproj";
-
-    QString projectConfigFilePath=dir.absoluteFilePath(projectConfigFileName);
-
-    std::string projConfigFile = projectConfigFilePath.toStdString();
-
-    //get image path
-    QDomDocument doc("svproj");
-    QString imageFolderName="Images";
-
-    QFile xmlFile(projectConfigFilePath);
-    xmlFile.open(QIODevice::ReadOnly);
-
-    QString *em=NULL;
-    doc.setContent(&xmlFile,em);
-    xmlFile.close();
-
-    QDomElement projDesc      = doc.firstChildElement("projectDescription");
-    QDomElement imagesElement = projDesc.firstChildElement("images");
-    imageFolderName           = imagesElement.attribute("folder_name");
-    QDomNodeList imageList    = imagesElement.elementsByTagName("image");
-
-    QDomNode imageNode = imageList.item(0);
-    QDomElement imageElement=imageNode.toElement();
-
-    QString inProj    = imageElement.attribute("in_project");
-    QString imageName = imageElement.attribute("name");
-    QString imagePath = imageElement.attribute("path");
-
-    if(inProj=="yes")
-    {
-        if(imagePath!="")
-        {
-            m_imageFilePath = (projPath
-            +"/"+imageFolderName.toStdString()+"/"+imagePath.toStdString());
-        }
-        else if(imageName!="")
-        {
-            m_imageFilePath = (projPath
-            +"/"+imageFolderName.toStdString()+"/"+imageName.toStdString());
-        }
+  auto rs = GetDataStorage()->GetDerivations(projFolderNode,mitk::NodePredicateDataType::New("sv4guiImageFolder"));
+  if (rs->size() > 0) {
+    mitk::DataNode::Pointer imageFolderNode = rs->GetElement(0);
+    rs = GetDataStorage()->GetDerivations(imageFolderNode);
+    if (rs->size() > 0) {
+      imageNode = rs->GetElement(0);
     }
-    else
-    {
-        m_imageFilePath = imageElement.attribute("path").toStdString();
-    }
+  } 
 
-    ml_utils = sv4gui_MachineLearningUtils::getInstance("googlenet_c30_train300k_aug10_clean");
-    ml_utils->setImage(m_imageFilePath);
+  if (imageNode.IsNull()) {
+    std::cout << "[initialize] imageNode is nullptr " << std::endl;
+    return;
+  }
 
-  }//end if projectfoldernode
+  if (imageNode->GetStringProperty("image_absolute_file_name", m_imageFilePath)) { 
+    std::cout << "[initialize] image_absolute_file_name: " << m_imageFilePath << std::endl;
+  }
 
+  ml_utils = sv4gui_MachineLearningUtils::getInstance("googlenet_c30_train300k_aug10_clean");
+  ml_utils->setImage(m_imageFilePath);
 }
 
 /**

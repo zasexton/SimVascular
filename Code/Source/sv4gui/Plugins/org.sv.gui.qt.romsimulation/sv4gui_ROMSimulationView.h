@@ -49,6 +49,7 @@
 #include "sv4gui_ROMSimulationLinesContainer.h"
 #include "sv4gui_ROMSimulationLinesMapper.h"
 #include "sv4gui_ROMSimulationPython.h"
+#include "sv4gui_ConvertWorkerROM.h"
 
 #include "sv4gui_CapSelectionWidget.h"
 #include "sv4gui_ProcessHandlerROM.h"
@@ -91,7 +92,8 @@ public:
     static const QString OUTLET_FACE_NAMES_FILE_NAME;
     static const QString RCR_BC_FILE_NAME;
     static const QString RESISTANCE_BC_FILE_NAME;
-    static const QString SOLVER_FILE_NAME;
+	static const QString SOLVER_0D_FILE_NAME;
+	static const QString SOLVER_1D_FILE_NAME;
 
     sv4guiROMSimulationView();
 
@@ -295,6 +297,11 @@ public slots:
 
     void SetupInternalSolverPaths();
 
+    // Slots executed by ConvertWorkerROM signals. 
+    void ShowConvertWorkerMessage(const bool errorMsg, const QString& msg);
+    void ConvertWorkerError(const QString& msg);
+    void ConvertWorkerFinished();
+
 public:
 
     virtual void CreateQtPartControl(QWidget *parent) override;
@@ -446,6 +453,9 @@ private:
     void ResetModel();
     void WriteModel();
 
+    void RunOneDSimulationJob(const QString& jobPath);
+    void RunZeroDSimulationJob(const QString& jobPath);
+
     sv4guiMesh* GetDataNodeMesh();
     mitk::DataNode::Pointer GetMeshFolderDataNode();
     std::vector<std::string> GetMeshNames();
@@ -472,6 +482,7 @@ private:
 
     QString GetExportResultsDir();
 
+    sv4guiConvertWorkerROM* m_ConvertWorker;
 };
 
 #endif // SV4GUI_ROMSIMULATIONVIEW_H

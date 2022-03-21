@@ -203,7 +203,8 @@ const QString sv4guiROMSimulationView::MODEL_SURFACE_FILE_NAME = "model_surface.
 const QString sv4guiROMSimulationView::OUTLET_FACE_NAMES_FILE_NAME = "outlet_face_names.dat";
 const QString sv4guiROMSimulationView::RCR_BC_FILE_NAME = "rcrt.dat";
 const QString sv4guiROMSimulationView::RESISTANCE_BC_FILE_NAME = "resistance.dat";
-const QString sv4guiROMSimulationView::SOLVER_FILE_NAME = "solver.in";
+const QString sv4guiROMSimulationView::SOLVER_0D_FILE_NAME = "solver_0d.in";
+const QString sv4guiROMSimulationView::SOLVER_1D_FILE_NAME = "solver_1d.in";
 
 // Set the values of the Surface Model Origin types.
 const QString sv4guiROMSimulationView::SurfaceModelSource::MESH_PLUGIN = "Mesh Plugin";
@@ -349,6 +350,9 @@ sv4guiROMSimulationView::sv4guiROMSimulationView() : ui(new Ui::sv4guiROMSimulat
     m_SimulationFilesCreated = false;
 
     m_CenterlinesSource = CenterlinesSource::CALCULATE;
+
+    m_ConvertWorker = nullptr;
+
 }
 
 //-------------------------
@@ -574,6 +578,53 @@ void sv4guiROMSimulationView::CreateQtPartControl( QWidget *parent )
     this->OnPreferencesChanged(berryprefs);
 
     mitk::RenderingManager::GetInstance()->RequestUpdateAll();
+}
+
+//--------------------------
+// ShowConvertWorkerMessage
+//--------------------------
+// The callback executed by an sv4guiConvertWorkerROM object's 'showMessage' event.
+//
+void sv4guiROMSimulationView::ShowConvertWorkerMessage(const bool errorMsg, const QString& msg)
+{
+  QMessageBox mb(nullptr);
+  mb.setWindowTitle(sv4guiROMSimulationView::MsgTitle);
+  mb.setDetailedText(msg);
+  mb.setDefaultButton(QMessageBox::Ok);
+
+  if (errorMsg) { 
+    mb.setIcon(QMessageBox::Critical);
+    mb.setText("Converting reduced-order results files has failed.");
+  } else {
+    mb.setIcon(QMessageBox::Information);
+    mb.setText("Converting reduced-order results files has completed.");
+  }
+
+  mb.exec();
+}
+
+//--------------------
+// ConvertWorkerError
+//--------------------
+// The callback executed by an sv4guiConvertWorkerROM object's 'error' event.
+//
+void sv4guiROMSimulationView::ConvertWorkerError(const QString& msg)
+{
+  ShowConvertWorkerMessage(true, msg);
+  ConvertWorkerFinished();
+}
+
+//-----------------------
+// ConvertWorkerFinished
+//-----------------------
+// The callback executed by an sv4guiConvertWorkerROM object's 'finish' event.
+//
+void sv4guiROMSimulationView::ConvertWorkerFinished()
+{
+  if (m_ConvertWorker != nullptr) {
+      delete m_ConvertWorker;
+      m_ConvertWorker = nullptr;
+  }
 }
 
 //----------------
@@ -1923,10 +1974,11 @@ void sv4guiROMSimulationView::OnSelectionChanged(std::vector<mitk::DataNode*> no
     }
 
     // Set the model order.
-    if (ui->ModelOrderZero_RadioButton->isChecked()) { 
-        m_MitkJob->SetModelOrder("0");
-    } else if (ui->ModelOrderOne_RadioButton->isChecked()) { 
-        m_MitkJob->SetModelOrder("1");
+    auto model_order = m_MitkJob->GetModelOrder();
+    if (model_order == "0") { 
+        ui->ModelOrderZero_RadioButton->setChecked(true); 
+    } else if (model_order == "1") { 
+       ui->ModelOrderOne_RadioButton->setChecked(true);
     }
 
     EnableConnection(false);
@@ -2136,7 +2188,7 @@ void sv4guiROMSimulationView::UpdateGUIBasic()
     //MITK_INFO << msg;
     //MITK_INFO << msg << "--------- UpdateGUIBasic ----------";
 
-    sv4guiROMSimJob* job=m_MitkJob->GetSimJob();
+    sv4guiROMSimJob* job = m_MitkJob->GetSimJob();
 
     if (job == NULL) {
         job = new sv4guiROMSimJob();
@@ -3383,7 +3435,6 @@ void sv4guiROMSimulationView::CreateSimulationFiles()
 void sv4guiROMSimulationView::RunJob()
 {
     auto msg = "[sv4guiROMSimulationView::RunJob] ";
-    //MITK_INFO << msg << "--------- RunJob ----------"; 
 
     if (!m_MitkJob) {
         return;
@@ -3395,6 +3446,56 @@ void sv4guiROMSimulationView::RunJob()
         return;
     }
     MITK_INFO << msg << "Job path: " << jobPath;
+
+    if (ui->ModelOrderZero_RadioButton->isChecked()) { 
+        RunZeroDSimulationJob(jobPath);
+    } else {
+        RunOneDSimulationJob(jobPath);
+    }
+
+}
+
+//-----------------------
+// RunZeroDSimulationJob
+//-----------------------
+// Execute a 0D simulation job.
+//
+// Arguments:
+//   jobPath: The simulation results output directory.
+//
+void sv4guiROMSimulationView::RunZeroDSimulationJob(const QString& jobPath)
+{
+    // Set job properties used to write solver log.
+    //
+    m_JobNode->SetStringProperty("output directory", GetJobPath().toStdString().c_str());
+    m_JobNode->SetStringProperty("solver log file", sv4guiROMSimulationView::SOLVER_LOG_FILE_NAME.toStdString().c_str());
+
+    sv4guiROMSimJob* job = m_MitkJob->GetSimJob();
+
+    QDir dir(jobPath);
+    dir.mkpath(jobPath);
+
+    // Execute the 0D solver.
+    auto pythonInterface = sv4guiROMSimulationPython();
+    auto statusMsg = "Executing a 0D simulation ..."; 
+    ui->JobStatusValueLabel->setText(statusMsg);
+    mitk::StatusBar::GetInstance()->DisplayText(statusMsg);
+    auto status = pythonInterface.ExecuteZeroDSimulation(jobPath.toStdString(), job);
+
+    statusMsg = "The 0D simulation has completed."; 
+    ui->JobStatusValueLabel->setText(statusMsg);
+    mitk::StatusBar::GetInstance()->DisplayText(statusMsg);
+}
+
+//----------------------
+// RunOneDSimulationJob 
+//----------------------
+// Execute a 1D simulation job.
+//
+void sv4guiROMSimulationView::RunOneDSimulationJob(const QString& jobPath)
+{
+    auto msg = "[sv4guiROMSimulationView::RunJob] ";
+    //MITK_INFO << msg << "--------- RunJob ----------"; 
 
     // Get the solver executable.
     auto solverExecutable = GetSolverExecutable();
@@ -3416,7 +3517,7 @@ void sv4guiROMSimulationView::RunJob()
     }
 */
 
-    mitk::StatusBar::GetInstance()->DisplayText("Running simulation ...");
+    mitk::StatusBar::GetInstance()->DisplayText("Running 1D simulation ...");
 
     QProcess* solverProcess = new QProcess(m_Parent);
     solverProcess->setWorkingDirectory(jobPath);
@@ -3596,8 +3697,13 @@ bool sv4guiROMSimulationView::CreateDataFiles(QString outputDir, bool outputAllF
     pythonInterface.AddParameter(params.OUTFLOW_BC_INPUT_FILE, outputDir.toStdString());
     WriteBCFiles(outputDir, job, pythonInterface);
 
-    auto solverFileName = SOLVER_FILE_NAME.toStdString(); 
-    pythonInterface.AddParameter(params.SOLVER_OUTPUT_FILE, solverFileName); 
+	QString solverFileName;
+	if (modelOrder == "0")
+		solverFileName = SOLVER_0D_FILE_NAME;
+	if (modelOrder == "1")
+		solverFileName = SOLVER_1D_FILE_NAME;
+	pythonInterface.AddParameter(params.SOLVER_OUTPUT_FILE,
+			solverFileName.toStdString());
 
     // Add basic physical parameters.
     auto density = m_TableModelBasic->item(TableModelBasicRow::Density,1)->text().trimmed().toStdString();
@@ -3627,7 +3733,7 @@ bool sv4guiROMSimulationView::CreateDataFiles(QString outputDir, bool outputAllF
         return false;
     }
 
-    m_SolverInputFile = outputDir + "/" + SOLVER_FILE_NAME;
+	m_SolverInputFile = outputDir + "/" + solverFileName;
     ui->RunSimulationPushButton->setEnabled(true);
 
     statusMsg = "Simulation files have been created."; 
@@ -3638,9 +3744,9 @@ bool sv4guiROMSimulationView::CreateDataFiles(QString outputDir, bool outputAllF
     return true;
 }
 
-//-------------------
-// AddMeshParameters
-//-------------------
+//-----------------------------
+// AddConvertResultsParameters 
+//-----------------------------
 // Add parameters used to convert results.
 //
 void sv4guiROMSimulationView::AddConvertResultsParameters(sv4guiROMSimJob* job, sv4guiROMSimulationPython& pythonInterface)
@@ -4763,6 +4869,10 @@ void sv4guiROMSimulationView::SelectSegmentExportType(int index)
 //---------------
 // Process the Convert Results button press.
 //
+// The 'run_from_c()' function in the 'extract_results.py' script located in the 
+// 'sv_rom_extract_results' module is executed to extract solution resulsts and write them
+// to files of various formats.
+//
 void sv4guiROMSimulationView::ExportResults()
 {
     auto msg = "sv4guiROMSimulationView::ExportResults";
@@ -4771,13 +4881,13 @@ void sv4guiROMSimulationView::ExportResults()
 
     QString resultDir = ui->lineEditResultDir->text();
     if (resultDir.isEmpty()) { 
-        QMessageBox::warning(m_Parent, "1D Simultation", "No results directory has been set.");
+        QMessageBox::warning(m_Parent, "ROM Simultation", "No results directory has been set.");
         return;
     }
 
     QString convertDir = ui->lineEditConvertDir->text();
     if (convertDir.isEmpty()) { 
-        QMessageBox::warning(m_Parent, "1D Simultation", "No convert directory has been set.");
+        QMessageBox::warning(m_Parent, "ROM Simultation", "No convert directory has been set.");
         return;
     }
 
@@ -4787,7 +4897,7 @@ void sv4guiROMSimulationView::ExportResults()
     QString stopTimeStr = ui->lineEditStop->text().trimmed();
     auto stopTime = std::stod(stopTimeStr.toStdString());
     if (stopTime < stopTime) { 
-        QMessageBox::warning(m_Parent,"1D Simulation", "The stop time must be larger than the start time.");
+        QMessageBox::warning(m_Parent,"ROM Simulation", "The stop time must be larger than the start time.");
         return;
     }
 
@@ -4798,17 +4908,26 @@ void sv4guiROMSimulationView::ExportResults()
    auto pythonInterface = sv4guiROMSimulationPythonConvert();
    auto params = pythonInterface.m_ParameterNames;
 
+   QString solverFileName;
+   if (modelOrder == "0") {
+       solverFileName = SOLVER_0D_FILE_NAME;
+   }
+
+   if (modelOrder == "1") {
+       solverFileName = SOLVER_1D_FILE_NAME;
+   }
+
    pythonInterface.AddParameter(params.MODEL_ORDER, modelOrder);
    pythonInterface.AddParameter(params.RESULTS_DIRECTORY, resultDir.toStdString());
-   pythonInterface.AddParameter(params.SOLVER_FILE_NAME, SOLVER_FILE_NAME.toStdString());
+   pythonInterface.AddParameter(params.SOLVER_FILE_NAME, solverFileName.toStdString());
 
    // Set the data names to convert.
    //
    std::string dataNames;
    auto selectedItems = ui->DataExportListWidget->selectedItems();
    if (selectedItems.size() == 0) { 
-        QMessageBox::warning(m_Parent,"1D Simulation", "No data names are selected to convert.");
-        return;
+       QMessageBox::warning(m_Parent,"1D Simulation", "No data names are selected to convert.");
+       return;
    }
 
    for (auto const& item : selectedItems) {
@@ -4831,22 +4950,12 @@ void sv4guiROMSimulationView::ExportResults()
        pythonInterface.AddParameter(params.OUTLET_SEGMENTS, "true"); 
    }
 
-   // Project results to centerline geometry. 
-   //
-   // The algorithm for projecting results also needs the centerlines geometry.
-   //
-   if (ui->ProjectCenterlines_CheckBox->isChecked() || ui->ProjectTo3DMesh_CheckBox->isChecked()) {
-       auto inputCenterlinesFile = m_CenterlinesFileName.toStdString();
-       MITK_INFO << msg << "inputCenterlinesFile: " << inputCenterlinesFile; 
-       pythonInterface.AddParameter(params.CENTERLINES_FILE, inputCenterlinesFile); 
-   }
-
    // Export results as numpy arrays.
    if (ui->ExportNumpy_CheckBox->isChecked()) {
        MITK_INFO << msg << "exportNumpy "; 
    }
 
-   // Project results to a 3D simulation mesh.
+   // Set parameters to project results to a 3D simulation mesh.
    //
    if (ui->ProjectTo3DMesh_CheckBox->isChecked()) {
        auto simName = ui->SimName_ComboBox->currentText().toStdString();
@@ -4867,36 +4976,59 @@ void sv4guiROMSimulationView::ExportResults()
        }
    }
 
+   // Set the name for the centerlines geometry file needed to project results to a mesh. 
+   //
+   if (ui->ProjectCenterlines_CheckBox->isChecked() || ui->ProjectTo3DMesh_CheckBox->isChecked()) {
+       auto inputCenterlinesFile = m_CenterlinesFileName.toStdString();
+       MITK_INFO << msg << "inputCenterlinesFile: " << inputCenterlinesFile; 
+       pythonInterface.AddParameter(params.CENTERLINES_FILE, inputCenterlinesFile); 
+   }
+
    QString jobName("");
    if (m_JobNode.IsNotNull()) {
        jobName = QString::fromStdString(m_JobNode->GetName());
    }
    MITK_INFO << msg << "jobName: " << jobName; 
 
-   convertDir = convertDir + "/" + jobName + "-converted-results";
+   QString modelOrderStr = QString::fromStdString(modelOrder);
+
+   convertDir = convertDir + "/" + jobName + "-converted-results_" + modelOrderStr + "d";
    QDir exdir(convertDir);
    exdir.mkpath(convertDir);
 
    pythonInterface.AddParameter(params.OUTPUT_DIRECTORY, convertDir.toStdString());
    pythonInterface.AddParameter(params.OUTPUT_FILE_NAME, jobName.toStdString());
 
-   // Execute the Python script to generate the 1D solver input file.
+   // Create a sv4guiConvertWorkerROM used to convert ROM solver results from a QThread
+   // so as not to freeze the SV GUI while executing.
    //
-   // The script writes a log file to the convert directory.
+   // The object is created here so the worker, which is executed in a separate thread, 
+   // can display messages using QMessage.
    //
-   auto statusMsg = "Converting simulation files ..."; 
-   ui->JobStatusValueLabel->setText(statusMsg);
-   mitk::StatusBar::GetInstance()->DisplayText(statusMsg);
+   // Note: This may cause SV to hang when importing scipy. 
+   //
+   #ifdef sv4guiROMSimulationView_ExportResults_use_threads
+   m_ConvertWorker = new sv4guiConvertWorkerROM();
+   connect(m_ConvertWorker, &sv4guiConvertWorkerROM::showMessage, this, &sv4guiROMSimulationView::ShowConvertWorkerMessage);
+   connect(m_ConvertWorker, &sv4guiConvertWorkerROM::finished, this, &sv4guiROMSimulationView::ConvertWorkerFinished);
+   connect(m_ConvertWorker, &sv4guiConvertWorkerROM::error, this, &sv4guiROMSimulationView::ConvertWorkerError);
+   auto status = pythonInterface.ConvertResultsWorker(m_ConvertWorker, convertDir.toStdString());
+
+   // Run a script as a separate process calling the SV Python interpreter.
+   //
+   // Note: This fails when importing vtk.
+   //
+   #elif sv4guiROMSimulationView_ExportResults_use_process
+
+   auto status = pythonInterface.ConvertResultsProcess(convertDir.toStdString());
+
+   // Run the convert within this process, will block GUI.
+   //
+   #else
+
    auto status = pythonInterface.ConvertResults(convertDir.toStdString());
 
-   if (!status) {
-       QMessageBox::warning(NULL, MsgTitle, "Converting reduced-order results has failed.");
-       return;
-   }
-
-   statusMsg = "1D simulation files have been converted.";
-   ui->JobStatusValueLabel->setText(statusMsg);
-   mitk::StatusBar::GetInstance()->DisplayText(statusMsg);
+   #endif
 }
 
 //------------------------

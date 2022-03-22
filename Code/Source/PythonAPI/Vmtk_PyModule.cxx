@@ -367,6 +367,10 @@ PyDoc_STRVAR(Vmtk_centerlines_doc,
         they are node IDs.                                                 \n\
      use_face_ids (bool): If True then the input IDs are face IDs, else    \n\
         they are node IDs.                                                 \n\
+     resample (bool): If True then the input IDs are resampled according to\n\
+                      the resampling_step                                  \n\
+     resampling_step (float): The step length defining the distance between  \n\
+                            points in the resampled centerline             \n\
    \n\
    Returns (vtkPolyData): The centerlines geometry (lines) and data.       \n\
 ");
@@ -376,7 +380,7 @@ Vmtk_centerlines(PyObject* self, PyObject* args, PyObject* kwargs)
 {
   //std::cout << "========== Vmtk_centerlines ==========" << std::endl;
   auto api = PyUtilApiFunction("OO!O!|O!O!", PyRunTimeErr, __func__);
-  static char *keywords[] = {"surface", "inlet_ids", "outlet_ids", "split", "use_face_ids", NULL};
+  static char *keywords[] = {"surface", "inlet_ids", "outlet_ids", "split", "use_face_ids", "resample", "resampling_step", NULL};
   PyObject* surfaceArg;
   PyObject* inletIdsArg;
   PyObject* outletIdsArg;
@@ -384,9 +388,12 @@ Vmtk_centerlines(PyObject* self, PyObject* args, PyObject* kwargs)
   bool splitCenterlines = true;
   PyObject* useFaceIdsArg = nullptr;
   bool useFaceIds = false;
+  PyObject* useResample = nullptr;
+  int resample = 0;
+  double resamplingStep = 1.0;
 
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, api.format, keywords, &surfaceArg, &PyList_Type, &inletIdsArg, 
-        &PyList_Type, &outletIdsArg, &PyBool_Type, &splitArg, &PyBool_Type, &useFaceIdsArg)) {
+        &PyList_Type, &outletIdsArg, &PyBool_Type, &splitArg, &PyBool_Type, &useFaceIdsArg, &PyBool_Type, &useResample, &resamplingStep)) {
       return api.argsError();
   }
 
@@ -463,13 +470,27 @@ Vmtk_centerlines(PyObject* self, PyObject* args, PyObject* kwargs)
       }
   }
 
+  // If resampling then the resampling flag is
+  // set on for the centerline extraction.
+  if (useResample != nullptr){
+      if (PyObject_IsTrue(useResample)){
+          resample = 1;
+      }
+  }
+  // If the resampling step is less than or
+  // equal to zero throw an error. Distance must
+  // be real and positive.
+  if (resamplingStep <= 0) {
+      api.error("The resampling_step must be greater than 0.");
+      return nullptr;
+  }
 
   // Calculate the centerlines.
   cvPolyData* linesDst = nullptr;
   cvPolyData* voronoiDst = nullptr;
   //std::cout << "[Vmtk_centerlines] Calculate centerlines ... " << std::endl;
 
-  if (sys_geom_centerlines(&cvSurfPolydata, sources.data(), numInletIds, targets.data(), numOutletIds, &linesDst, &voronoiDst) != SV_OK) {
+  if (sys_geom_centerlines(&cvSurfPolydata, sources.data(), numInletIds, targets.data(), numOutletIds, &linesDst, &voronoiDst, resample, resamplingStep) != SV_OK) {
       api.error("Error calculating centerlines.");
       return nullptr;
   }

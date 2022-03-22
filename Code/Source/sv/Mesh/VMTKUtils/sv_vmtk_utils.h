@@ -53,7 +53,7 @@
 
 SV_EXPORT_VMTK_UTILS int sys_geom_centerlines( cvPolyData *polydata, int *source, int nsources,
                             int *targets, int ntargets,
-			    cvPolyData **lines, cvPolyData **voronoi);
+			    cvPolyData **lines, cvPolyData **voronoi, int resample = 0, float resamplingStep = 1.0);
 
 SV_EXPORT_VMTK_UTILS int sys_geom_grouppolydata( cvPolyData *polydata,cvPolyData *lines,cvPolyData **grouped );
 

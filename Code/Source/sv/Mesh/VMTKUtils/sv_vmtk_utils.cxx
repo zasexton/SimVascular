@@ -106,12 +106,15 @@
  *  @param ntargets number of target cap ids
  *  @param **lines returned center lines as vtkPolyData
  *  @param ** voronoi returned voronoi diagram as vtkPolyData
+ *  @param resample flag for centerline resampling
+ *  @param resampleStep float for distance between resampled points
  *  @return SV_OK if the VTMK function executes properly
  */
 
 int sys_geom_centerlines( cvPolyData *polydata,int *sources,int nsources,
 		int *targets,int ntargets,
-		cvPolyData **lines, cvPolyData **voronoi)
+		cvPolyData **lines, cvPolyData **voronoi, int resample,
+                float resamplingStep)
 {
   vtkPolyData *geom = polydata->GetVtkPolyData();
   cvPolyData *result1 = NULL;
@@ -148,8 +151,8 @@ int sys_geom_centerlines( cvPolyData *polydata,int *sources,int nsources,
     centerLiner->SetFlipNormals(0);
     centerLiner->SetAppendEndPointsToCenterlines(1);
     centerLiner->SetSimplifyVoronoi(0);
-    centerLiner->SetCenterlineResampling(0);
-    centerLiner->SetResamplingStepLength(1);
+    centerLiner->SetCenterlineResampling(resample);
+    centerLiner->SetResamplingStepLength(resamplingStep);
     centerLiner->Update();
 
     result1 = new cvPolyData( centerLiner->GetOutput() );

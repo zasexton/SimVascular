@@ -352,7 +352,7 @@ Vmtk_cap_with_ids(PyObject* self, PyObject* args, PyObject* kwargs)
 //
 PyDoc_STRVAR(Vmtk_centerlines_doc,
    "centerlines(surface, inlet_ids, outlet_ids, split=True,                \n\
-        use_face_ids=False)                                                \n\
+        use_face_ids=False,resample=False,resampling_step=1.0)             \n\
    \n\
    Compute the centerlines for a closed surface.                            \n\
    \n\
@@ -379,7 +379,7 @@ static PyObject *
 Vmtk_centerlines(PyObject* self, PyObject* args, PyObject* kwargs)
 {
   //std::cout << "========== Vmtk_centerlines ==========" << std::endl;
-  auto api = PyUtilApiFunction("OO!O!|O!O!", PyRunTimeErr, __func__);
+  auto api = PyUtilApiFunction("OO!O!|O!O!O!d", PyRunTimeErr, __func__);
   static char *keywords[] = {"surface", "inlet_ids", "outlet_ids", "split", "use_face_ids", "resample", "resampling_step", NULL};
   PyObject* surfaceArg;
   PyObject* inletIdsArg;
@@ -389,7 +389,7 @@ Vmtk_centerlines(PyObject* self, PyObject* args, PyObject* kwargs)
   PyObject* useFaceIdsArg = nullptr;
   bool useFaceIds = false;
   PyObject* useResample = nullptr;
-  int resample = 0;
+  bool resample = false;
   double resamplingStep = 1.0;
 
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, api.format, keywords, &surfaceArg, &PyList_Type, &inletIdsArg, 
@@ -474,7 +474,7 @@ Vmtk_centerlines(PyObject* self, PyObject* args, PyObject* kwargs)
   // set on for the centerline extraction.
   if (useResample != nullptr){
       if (PyObject_IsTrue(useResample)){
-          resample = 1;
+          resample = true;
       }
   }
   // If the resampling step is less than or

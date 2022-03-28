@@ -54,9 +54,12 @@ Version:   $Revision: 1.1 $
 #include "vtkThreshold.h"
 #include "vtkPointDataToCellData.h"
 #include "vtkSortDataArray.h"
+#include "vtkSplineFilter.h"
 
 #include "vtkvmtkCenterlineUtilities.h"
 #include "vtkvmtkPolyDataBranchUtilities.h"
+#include "vtkvmtkMergeCenterlines.h"
+#include "vtkvmtkCenterlineBranchExtractor.h"
 
 #define vtkNew(type,name) vtkSmartPointer<type> name = vtkSmartPointer<type>::New()
 
@@ -83,6 +86,8 @@ vtkvmtkPolyDataCenterlineSections::vtkvmtkPolyDataCenterlineSections()
     this->CenterlineSectionNormalArrayName = NULL;
     this->CenterlineSectionClosedArrayName = NULL;
     this->CenterlineSectionBifurcationArrayName = NULL;
+    this->Resample = NULL;
+    this->ResampleStep = NULL;
 }
 
 vtkvmtkPolyDataCenterlineSections::~vtkvmtkPolyDataCenterlineSections()
@@ -250,7 +255,13 @@ int vtkvmtkPolyDataCenterlineSections::RequestData(
         fprintf(stderr,"CenterlineSectionNormalArrayName not specified");
         return SV_ERROR;
     }
-
+    /*
+    if (!Resample)
+    {
+        fprintf(stderr,"Resample flag not specified");
+        return SV_ERROR;
+    }
+    */
     vtkNew(vtkPoints, outputPoints);
     vtkNew(vtkCellArray, outputPolys);
 
@@ -348,7 +359,6 @@ int vtkvmtkPolyDataCenterlineSections::RequestData(
         fprintf(stderr,"RefineCapPoints failed");
         return SV_ERROR;
     }
-
     // initialize centerline arrays
     this->Centerlines->GetPointData()->AddArray(centerlineAreaArray);
     this->Centerlines->GetPointData()->AddArray(centerlineMinSizeArray);
@@ -356,7 +366,7 @@ int vtkvmtkPolyDataCenterlineSections::RequestData(
     this->Centerlines->GetPointData()->AddArray(centerlineShapeArray);
     this->Centerlines->GetPointData()->AddArray(centerlineClosedArray);
     this->Centerlines->GetPointData()->AddArray(centerlineBifurcationArray);
-
+    //std::cout<<  "Arrays added to centerline" <<endl;
     numberOfCenterlinePoints = this->Centerlines->GetNumberOfPoints();
 
     centerlineAreaArray->SetNumberOfTuples(numberOfCenterlinePoints);
@@ -1041,14 +1051,22 @@ int vtkvmtkPolyDataCenterlineSections::BranchSurface(char* nameThis, char* nameO
 
 int vtkvmtkPolyDataCenterlineSections::GenerateCleanCenterline()
 {
-    // remove duplicate points
+
+	// remove duplicate points
+    vtkNew(vtkXMLPolyDataWriter,writer1);
+    writer1->SetFileName("/home/zsexton/Downloads/original_result.vtp");
+    writer1->SetInputDataObject(this->Centerlines);
+    writer1->Update();
     vtkNew(vtkCleanPolyData, cleaner);
     cleaner->SetInputData(this->Centerlines);
     cleaner->PointMergingOn();
     cleaner->Update();
-    vtkPolyData* centerlines = cleaner->GetOutput();
-    this->n_centerlines = centerlines->GetNumberOfCells();
+    vtkPolyData* centerlines = vtkPolyData::New();
+    centerlines->DeepCopy(cleaner->GetOutput());
 
+
+    this->n_centerlines = centerlines->GetNumberOfCells();
+    //std::cout<<"  number of centerlines"<<this->n_centerlines<<endl;
     // check if geometry is one piece
     if (!(this->IsOnePiece(cleaner->GetOutput())))
     {
@@ -1067,15 +1085,18 @@ int vtkvmtkPolyDataCenterlineSections::GenerateCleanCenterline()
     // copy radius array from centerline
     vtkNew(vtkDoubleArray, radius);
     radius->SetName(this->RadiusArrayName);
-    radius->SetNumberOfValues(centerlines->GetNumberOfPoints());
-    radius->Fill(0.0);
+    if (!this->Resample){
+        radius->SetNumberOfValues(centerlines->GetNumberOfPoints());
+        radius->Fill(0.0);
+    }
 
     // create unique id for each point
     vtkNew(vtkIntArray, nodeId);
     nodeId->SetName(this->GlobalNodeIdArrayName);
-    nodeId->SetNumberOfValues(centerlines->GetNumberOfPoints());
-    nodeId->Fill(0);
-
+    if (!this->Resample){
+        nodeId->SetNumberOfValues(centerlines->GetNumberOfPoints());
+        nodeId->Fill(0);
+    }
     // create id array for centerline
     vtkNew(vtkIntArray, centId);
     centId->SetName(this->CenterlineIdArrayName);
@@ -1083,66 +1104,249 @@ int vtkvmtkPolyDataCenterlineSections::GenerateCleanCenterline()
     centId->SetNumberOfComponents(this->n_centerlines);
     centId->Fill(0);
 
+    //resampled id array for centerline
+    vtkNew(vtkIntArray,resampledCentId);
+    resampledCentId->SetName(this->CenterlineIdArrayName);
+    resampledCentId->SetNumberOfComponents(this->n_centerlines);
+    resampledCentId->InsertComponent(0, 0, 0);
+	for (int comp=0; comp < this->n_centerlines; comp++){
+		resampledCentId->SetComponent(0, comp, 0);
+	}
+    resampledCentId->SetComponent(0, 0, 1);
     // add inlet point
-    points->InsertNextPoint(centerlines->GetPoint(0));
+    vtkIdType prev_id = points->InsertNextPoint(centerlines->GetPoint(0));
     pointIds->InsertNextId(0);
-    radius->SetValue(0, centerlines->GetPointData()->GetArray(this->RadiusArrayName)->GetTuple1(0));
-
-    // loop all centerlines
-    for (int c = 0; c < this->n_centerlines; c++)
-    {
-        // individual centerline
-        vtkCell* cell = centerlines->GetCell(c);
-
-        // loop through all points in centerline (assumes points are ordered consecutively)
-        for (int p = 0; p < cell->GetNumberOfPoints(); p++)
-        {
-            int i = cell->GetPointId(p);
-
-            // add point and line only if point hasn't been added yet
-            if ((pointIds->IsId(i) == -1) && (i > 0))
-            {
-                // add point
-                points->InsertNextPoint(centerlines->GetPoint(i));
-                pointIds->InsertNextId(i);
-
-                // add line connecting this point and previous point
-                int id_prev = pointIds->IsId(cell->GetPointId(p - 1));
-                int id_this = pointIds->IsId(cell->GetPointId(p));
-                vtkNew(vtkLine, line);
-                line->GetPointIds()->SetId(0, id_prev);
-                line->GetPointIds()->SetId(1, id_this);
-                lines->InsertNextCell(line);
-
-                // copy radius
-                radius->SetValue(id_this, centerlines->GetPointData()->GetArray(this->RadiusArrayName)->GetTuple1(i));
-
-                // set ids
-                nodeId->SetValue(id_this, pointIds->GetNumberOfIds());
-                centId->SetComponent(id_this, c, 1);
-            }
-            else
-                centId->SetComponent(pointIds->IsId(i), c, 1);
-        }
+    if (this->Resample){
+        radius->InsertNextValue(centerlines->GetPointData()->GetArray(this->RadiusArrayName)->GetTuple1(0));
+    }
+    else {
+        radius->SetValue(0, centerlines->GetPointData()->GetArray(this->RadiusArrayName)->GetTuple1(0));
     }
 
+    vtkNew(vtkIdList,pointIdMap);
+    pointIdMap->InsertNextId(0);
+    // loop all centerlines
+    vtkNew(vtkPolyData,centerlines2);
+    centerlines2->DeepCopy(centerlines);
+    if (this->Resample){
+		for (int c = 0; c < this->n_centerlines; c++)
+		{
+			// individual centerline
+			vtkCell* cell = centerlines->GetCell(c);
+			double point0[3], point1[3], point[3];
+			double abscissa, lineAbscissa, lineLength, stepAbscissa;
+
+			abscissa = 0.0;
+			lineAbscissa = 0.0;
+			lineLength = 0.0;
+			stepAbscissa = 0.0;
+
+			// loop through all points in centerline (assumes points are ordered consecutively)
+			for (int p = 0; p < cell->GetNumberOfPoints()-1; p ++)
+			{
+				int i = cell->GetPointId(p);
+				int ii = cell->GetPointId(p+1);
+				// add point and line only if point hasn't been added yet
+				cell->GetPoints()->GetPoint(p,point0);
+				cell->GetPoints()->GetPoint(p+1,point1);
+
+				double radius0 = centerlines->GetPointData()->GetArray(this->RadiusArrayName)->GetTuple1(i);
+				double radius1 = centerlines->GetPointData()->GetArray(this->RadiusArrayName)->GetTuple1(i+1);
+
+				double length = sqrt(vtkMath::Distance2BetweenPoints(point0, point1));
+				if ((pointIds->IsId(i) == -1) && (i > 0))
+				{
+					// Keep track of points in all previous centerlines
+					pointIds->InsertNextId(i);
+					pointIdMap->InsertNextId(points->GetNumberOfPoints());
+
+					// If a point is a bifurcation point then it must be added
+					double pcoord = 0.0;
+					double pcoordStep = this->ResampleStep / length;
+
+					for (int cc=0; cc < this->n_centerlines; cc++){
+						if (cc != c){
+							if (p < centerlines2->GetCell(cc)->GetNumberOfPoints()) {
+								int io = centerlines2->GetCell(cc)->GetPointId(p);
+								int ioo = centerlines2->GetCell(cc)->GetPointId(p+1);
+								if (i == io){
+									if (ii != ioo){
+										vtkIdType this_id = points->InsertNextPoint(point0);
+										pointIdMap->InsertNextId(this_id);
+										radius->InsertNextValue(radius0);
+										vtkNew(vtkLine,line);
+										line->GetPointIds()->SetId(0, prev_id);
+										line->GetPointIds()->SetId(1, this_id);
+										lines->InsertNextCell(line);
+										resampledCentId->InsertComponent(this_id, c, 0);
+										for (int comp=0; comp < this->n_centerlines; comp++){
+											resampledCentId->SetComponent(this_id, comp, 0);
+										}
+										resampledCentId->SetComponent(this_id, c, 1);
+										prev_id = this_id;
+
+										pcoord = pcoord + pcoordStep;
+										break;
+
+									}
+								}
+							}
+						}
+					}
+
+					if (length < this->ResampleStep - stepAbscissa){
+						stepAbscissa = stepAbscissa + length;
+						continue;
+					}
+					else {
+						point[0] = point0[0] + (point1[0]-point0[0]) * pcoord;
+						point[1] = point0[1] + (point1[1]-point0[1]) * pcoord;
+						point[2] = point0[2] + (point1[2]-point0[2]) * pcoord;
+
+						double scalar = radius0 + (radius1 - radius0) * pcoord;
+
+						pcoord = pcoord + pcoordStep;
+
+						vtkIdType this_id = points->InsertNextPoint(point);
+						radius->InsertNextValue(scalar);
+
+						vtkNew(vtkLine,line);
+						line->GetPointIds()->SetId(0, prev_id);
+						line->GetPointIds()->SetId(1, this_id);
+						lines->InsertNextCell(line);
+						nodeId->InsertNextValue(this_id);
+						centId->SetComponent(i,c,1);
+						resampledCentId->InsertComponent(this_id, c, 0);
+						for (int comp=0; comp < this->n_centerlines; comp++){
+							resampledCentId->SetComponent(this_id, comp, 0);
+						}
+						resampledCentId->SetComponent(this_id, c, 1);
+						prev_id = this_id;
+					}
+
+					// add point
+
+					while (pcoord < 1.0){
+						point[0] = point0[0] + (point1[0]-point0[0]) * pcoord;
+						point[1] = point0[1] + (point1[1]-point0[1]) * pcoord;
+						point[2] = point0[2] + (point1[2]-point0[2]) * pcoord;
+
+						double scalar = radius0 + (radius1 - radius0) * pcoord;
+
+						vtkIdType this_id = points->InsertNextPoint(point);
+						radius->InsertNextValue(scalar);
+
+						// add line connecting this point and previous point
+						vtkNew(vtkLine,line);
+						line->GetPointIds()->SetId(0, prev_id);
+						line->GetPointIds()->SetId(1, this_id);
+						lines->InsertNextCell(line);
+						prev_id = this_id;
+
+						nodeId->InsertNextValue(this_id);
+						centId->SetComponent(i,c,1);
+						resampledCentId->InsertComponent(this_id, c, 0);
+						for (int comp=0; comp < this->n_centerlines; comp++){
+							resampledCentId->SetComponent(this_id, comp, 0);
+						}
+						resampledCentId->SetComponent(this_id, c, 1);
+						if (pcoord + pcoordStep > 1.0){
+							break;
+						}
+						pcoord = pcoord + pcoordStep;
+					}
+				stepAbscissa = (1.0 - pcoord) * length;
+				}
+				else if ((pointIds->IsId(i) != -1) && (pointIds->IsId(ii) == -1) && (i > 0) && (ii > 0)) {
+					prev_id = pointIdMap->GetId(i);
+					centId->SetComponent(pointIds->IsId(i), c, 1);
+					resampledCentId->SetComponent(pointIdMap->GetId(i), c, 1);
+				}
+				else {
+					centId->SetComponent(pointIds->IsId(i), c, 1);
+					resampledCentId->SetComponent(pointIdMap->GetId(i), c, 1);
+					//centId->SetComponent(pointIdMap->GetId(i),c,1);
+				}
+			}
+			pointIds->InsertNextId(cell->GetPointId(cell->GetNumberOfPoints()-1));
+			vtkIdType this_id = points->InsertNextPoint(cell->GetPoints()->GetPoint(cell->GetNumberOfPoints()-1));
+			pointIdMap->InsertNextId(points->GetNumberOfPoints());
+			radius->InsertNextValue(centerlines->GetPointData()->GetArray(this->RadiusArrayName)->GetTuple1(cell->GetPointId(cell->GetNumberOfPoints()-1)));
+			vtkNew(vtkLine,line);
+			line->GetPointIds()->SetId(0,prev_id);
+			line->GetPointIds()->SetId(1,this_id);
+			lines->InsertNextCell(line);
+			prev_id = this_id;
+			nodeId->InsertNextValue(this_id);
+			centId->SetComponent(pointIds->IsId(cell->GetPointId(cell->GetNumberOfPoints()-1)), c, 1);
+			resampledCentId->InsertComponent(this_id, c, 0);
+			for (int comp=0; comp < this->n_centerlines; comp++){
+				resampledCentId->SetComponent(this_id, comp, 0);
+			}
+			resampledCentId->InsertComponent(this_id, c, 1);
+		}
+    }
+    else {
+        for (int c = 0; c < this->n_centerlines; c++)
+        {
+            // individual centerline
+            vtkCell* cell = centerlines->GetCell(c);
+
+            // loop through all points in centerline (assumes points are ordered consecutively)
+            for (int p = 0; p < cell->GetNumberOfPoints(); p++)
+            {
+                int i = cell->GetPointId(p);
+
+                // add point and line only if point hasn't been added yet
+                if ((pointIds->IsId(i) == -1) && (i > 0))
+                {
+                    // add point
+                    points->InsertNextPoint(centerlines->GetPoint(i));
+                    pointIds->InsertNextId(i);
+
+                    // add line connecting this point and previous point
+                    int id_prev = pointIds->IsId(cell->GetPointId(p - 1));
+                    int id_this = pointIds->IsId(cell->GetPointId(p));
+                    vtkNew(vtkLine, line);
+                    line->GetPointIds()->SetId(0, id_prev);
+                    line->GetPointIds()->SetId(1, id_this);
+                    lines->InsertNextCell(line);
+
+                    // copy radius
+                    radius->SetValue(id_this, centerlines->GetPointData()->GetArray(this->RadiusArrayName)->GetTuple1(i));
+
+                    // set ids
+                    nodeId->SetValue(id_this, pointIds->GetNumberOfIds());
+                    centId->SetComponent(id_this, c, 1);
+                }
+                else
+                    centId->SetComponent(pointIds->IsId(i), c, 1);
+            }
+        }
+    }
     // create polydata
     vtkNew(vtkPolyData, polydata);
     polydata->SetPoints(points);
     polydata->SetLines(lines);
     polydata->Modified();
 
-    // check mesh consistency
-    if (polydata->GetNumberOfPoints() != cleaner->GetOutput()->GetNumberOfPoints())
-    {
-        fprintf(stderr, "Number of points mismatch");
-        return SV_ERROR;
-    }
-    if (polydata->GetNumberOfPoints() != polydata->GetNumberOfCells() + 1)
-    {
-        fprintf(stderr, "Number of cells mismatch");
-        return SV_ERROR;
-    }
+    vtkNew(vtkXMLPolyDataWriter,writer);
+    writer->SetFileName("/home/zsexton/Downloads/resampled_result.vtp");
+    writer->SetInputDataObject(polydata);
+    writer->Update();
+
+    //if (polydata->GetNumberOfPoints() != cleaner->GetOutput()->GetNumberOfPoints())
+    //{
+    //    fprintf(stderr, "Number of points mismatch");
+    //    return SV_ERROR;
+    //}
+    //}
+
+    //if (polydata->GetNumberOfPoints() != polydata->GetNumberOfCells() + 1)
+    //{
+    //    fprintf(stderr, "Number of cells mismatch");
+    //    return SV_ERROR;
+    //}
 
     // add preliminary arrays for branches and bifurcations based on element connectivity
     vtkNew(vtkIntArray, bifurcation);
@@ -1153,14 +1357,17 @@ int vtkvmtkPolyDataCenterlineSections::GenerateCleanCenterline()
     branch->SetNumberOfValues(polydata->GetNumberOfPoints());
     bifurcation->Fill(-1);
     branch->Fill(-1);
-
     // add arrays to centerline
     polydata->GetPointData()->AddArray(bifurcation);
     polydata->GetPointData()->AddArray(branch);
     polydata->GetPointData()->AddArray(radius);
     polydata->GetPointData()->AddArray(nodeId);
-    polydata->GetPointData()->AddArray(centId);
-
+    if (this->Resample){
+        polydata->GetPointData()->AddArray(resampledCentId);
+    }
+    else{
+    	polydata->GetPointData()->AddArray(centId);
+    }
     // go through tree and color each branch/bifurcation
     vtkNew(vtkIdList, cellIds);
     int branchId = 0;
@@ -1181,7 +1388,6 @@ int vtkvmtkPolyDataCenterlineSections::GenerateCleanCenterline()
             branchId++;
         }
     }
-
     // build locator for centerline points
     vtkNew(vtkPolyData, dataset);
     dataset->SetPoints(polydata->GetPoints());
@@ -1196,7 +1402,6 @@ int vtkvmtkPolyDataCenterlineSections::GenerateCleanCenterline()
     vtkNew(vtkIdList, closePoints);
 
     double point[3];
-
     // mark points within one sphere radius downstream of bifurcation as bifurcation
     for (int i = 0; i < polydata->GetNumberOfPoints(); i++)
     {
@@ -1321,11 +1526,173 @@ int vtkvmtkPolyDataCenterlineSections::GenerateCleanCenterline()
                     points->SetPoint(k, point1);
                 }
 
+
+
     this->Centerlines->DeepCopy(polydata);
 
+    //if (this->Resample){
+    //    if (this->ResampleCenterlines() == SV_ERROR){
+    //        fprintf(stderr,"Resampling failed");
+    //        return SV_ERROR;
+    //    }
+    //}
     return SV_OK;
 }
 
+int vtkvmtkPolyDataCenterlineSections::ResampleCenterlines()
+{
+  vtkPolyData* output = this->Centerlines;
+  vtkPolyData* resampledCenterlines = vtkPolyData::New();
+  vtkPoints* resampledCenterlinesPoints = vtkPoints::New();
+  vtkCellArray* resampledCenterlinesCellArray = vtkCellArray::New();
+  //std::cout<<output->GetNumberOfPoints()<<endl;
+
+  vtkDoubleArray* resampledCenterlinesRadiusArray = vtkDoubleArray::New();
+  resampledCenterlinesRadiusArray->SetName(this->RadiusArrayName);
+
+  //vtkDoubleArray* resampledCenterlinesNormalArray = vtkDoubleArray::New();
+  //resampledCenterlinesNormalArray->SetName(this->CenterlineSectionNormalArrayName);
+  //resampledCenterlinesNormalArray->SetNumberOfComponents(3);
+
+  //vtkIntArray* resampledCenterlinesCentIdArray = vtkIntArray::New();
+  //resampledCenterlinesCentIdArray->SetName(this->CenterlineIdArrayName);
+  //resampledCenterlinesCentIdArray->SetNumberOfComponents(3);
+
+  //vtkIntArray* resampledCenterlinesBifurcationIdArray = vtkIntArray::New();
+  //resampledCenterlinesBifurcationIdArray->SetName(this->BifurcationIdArrayNameTmp);
+
+  //vtkIntArray* resampledCenterlinesBranchIdArray = vtkIntArray::New();
+  //resampledCenterlinesBranchIdArray->SetName(this->BranchIdArrayNameTmp);
+
+  //vtkIntArray* resampledCenterlinesNodeIdArray = vtkIntArray::New();
+  //resampledCenterlinesNodeIdArray->SetName(this->GlobalNodeIdArrayName);
+
+  vtkIdList* resampledCell = vtkIdList::New();
+
+  vtkDoubleArray* centerlinesRadiusArray = vtkDoubleArray::SafeDownCast(output->GetPointData()->GetArray(this->RadiusArrayName));
+  //vtkDoubleArray* centerlinesNormalArray = vtkDoubleArray::SafeDownCast(output->GetPointData()->GetArray(this->CenterlineSectionNormalArrayName));
+  //vtkIntArray* centerlinesBifurcationIdArray = vtkIntArray::SafeDownCast(output->GetPointData()->GetArray(this->BifurcationIdArrayNameTmp));
+  //vtkIntArray* centerlinesBranchIdArray = vtkIntArray::SafeDownCast(output->GetPointData()->GetArray(this->BranchIdArrayNameTmp));
+  //vtkIntArray* centerlinesCentIdArray = vtkIntArray::SafeDownCast(output->GetPointData()->GetArray(this->CenterlineIdArrayName));
+  //vtkIntArray* centerlinesNodeIdArray = vtkIntArray::SafeDownCast(output->GetPointData()->GetArray(this->GlobalNodeIdArrayName));
+
+  // new resampled points
+  //vtkPoints* points = vtkPoints::New();
+  //vtkCellArray* lines = vtkCellArray::New();
+  //vtkIdList* insertList = vtkIdList::New();
+  std::cout<<"Number of cells: "<<output->GetNumberOfCells()<<endl;
+  for (int k=0; k< output->GetNumberOfCells(); k++)
+    {
+    vtkCell* cell = output->GetCell(k);
+
+    resampledCell->Initialize();
+    vtkIdType id = resampledCenterlinesPoints->InsertNextPoint(cell->GetPoints()->GetPoint(0));
+    resampledCell->InsertNextId(id);
+    //resampledCenterlinesNormalArray->InsertNextTuple(centerlinesNormalArray->GetTuple(cell->GetPointId(0)));
+    resampledCenterlinesRadiusArray->InsertNextValue(centerlinesRadiusArray->GetValue(cell->GetPointId(0)));
+    //resampledCenterlinesBifurcationIdArray->InsertNextValue(centerlinesBifurcationIdArray->GetValue(cell->GetPointId(0)));
+    //resampledCenterlinesBranchIdArray->InsertNextValue(centerlinesBranchIdArray->GetValue(cell->GetPointId(0)));
+    //resampledCenterlinesNodeIdArray->InsertNextValue(id);
+
+    double point0[3], point1[3], point[3];
+    //double normal0[3], normal1[3], normal[3];
+    double abscissa, lineAbscissa, lineLength, stepAbscissa;
+
+    abscissa = 0.0;
+    lineAbscissa = 0.0;
+    lineLength = 0.0;
+    stepAbscissa = 0.0;
+
+    for (int i=0; i< cell->GetNumberOfPoints()-1; i++)
+      {
+      cell->GetPoints()->GetPoint(i,point0);
+      cell->GetPoints()->GetPoint(i+1,point1);
+      //centerlinesNormalArray->GetTuple(cell->GetPointId(i),normal0);
+      //centerlinesNormalArray->GetTuple(cell->GetPointId(i+1),normal1);
+
+      double scalar0 = centerlinesRadiusArray->GetValue(cell->GetPointId(i));
+      double scalar1 = centerlinesRadiusArray->GetValue(cell->GetPointId(i+1));
+
+      //int branchId0 = centerlinesBranchIdArray->GetValue(cell->GetPointId(i));
+      //int bifurcationId0 = centerlinesBifurcationIdArray->GetValue(cell->GetPointId(i));
+      //int centId0 = centerlinesCentIdArray->GetValue(cell->GetPointId(i));
+      //int branchId1 = centerlinesBranchIdArray->GetValue(cell->GetPointId(i+1));
+      //int bifurcationId1 = centerlinesBifurcationIdArray->GetValue(cell->GetPointId(i+1));
+      //int centId1 = centerlinesCentIdArray->GetValue(cell->GetPointId(i+1));
+      //std::cout<<centId0<<endl;
+      double length = sqrt(vtkMath::Distance2BetweenPoints(point0,point1));
+      //std::cout<<"  cell length"<<length<<endl;
+      //std::cout<<"  resample length"<<this->ResampleStep<<endl;
+      if (length < this->ResampleStep - stepAbscissa)
+        {
+        stepAbscissa = stepAbscissa + length;
+        continue;
+        }
+
+      double pcoord = 0.0;
+      double pcoordStep = this->ResampleStep / length;
+      while (pcoord < 1.0)
+        {
+        point[0] = point0[0] + (point1[0] - point0[0]) * pcoord;
+        point[1] = point0[1] + (point1[1] - point0[1]) * pcoord;
+        point[2] = point0[2] + (point1[2] - point0[2]) * pcoord;
+
+        //normal[0] = normal0[0] + (normal1[0] - normal0[0]) * pcoord;
+        //normal[1] = normal0[1] + (normal1[1] - normal0[1]) * pcoord;
+        //normal[2] = normal0[2] + (normal1[2] - normal0[2]) * pcoord;
+
+        double scalar = scalar0 + (scalar1 - scalar0) * pcoord;
+
+        vtkIdType id = resampledCenterlinesPoints->InsertNextPoint(point);
+        //std::cout<<id<<endl;
+        resampledCell->InsertNextId(id);
+        resampledCenterlinesRadiusArray->InsertNextValue(scalar);
+        //resampledCenterlinesNormalArray->InsertNextTuple(normal);
+        //if (pcoord > 0.5) {
+        //	resampledCenterlinesCentIdArray->InsertNextValue(centId1);
+        //    resampledCenterlinesBranchIdArray->InsertNextValue(branchId1);
+        //    resampledCenterlinesBifurcationIdArray->InsertNextValue(bifurcationId1);
+        //}
+        //else {
+        //    resampledCenterlinesCentIdArray->InsertNextValue(centId0);
+        //    resampledCenterlinesBranchIdArray->InsertNextValue(branchId0);
+        //    resampledCenterlinesBifurcationIdArray->InsertNextValue(bifurcationId0);
+        //}
+        //resampledCenterlinesNodeIdArray->InsertNextValue(id);
+        if (pcoord + pcoordStep > 1.0)
+          {
+          break;
+          }
+        pcoord = pcoord + pcoordStep;
+        }
+      stepAbscissa = (1.0 - pcoord) * length;
+      }
+
+    id = resampledCenterlinesPoints->InsertNextPoint(cell->GetPoints()->GetPoint(cell->GetNumberOfPoints()-1));
+    resampledCell->InsertNextId(id);
+    resampledCenterlinesRadiusArray->InsertNextValue(centerlinesRadiusArray->GetValue(cell->GetPointId(cell->GetNumberOfPoints()-1)));
+    //resampledCenterlinesNormalArray->InsertNextTuple(centerlinesNormalArray->GetTuple(cell->GetPointId(cell->GetNumberOfPoints()-1)));
+    //resampledCenterlinesCentIdArray->InsertNextValue(centerlinesCentIdArray->GetValue(cell->GetPointId(cell->GetNumberOfPoints()-1)));
+    //resampledCenterlinesBranchIdArray->InsertNextValue(centerlinesBranchIdArray->GetValue(cell->GetPointId(cell->GetNumberOfPoints()-1)));
+    //resampledCenterlinesBifurcationIdArray->InsertNextValue(centerlinesBifurcationIdArray->GetValue(cell->GetPointId(cell->GetNumberOfPoints()-1)));
+    //resampledCenterlinesNodeIdArray->InsertNextValue(id);
+    resampledCenterlinesCellArray->InsertNextCell(resampledCell);
+    }
+
+  resampledCenterlines->SetPoints(resampledCenterlinesPoints);
+  resampledCenterlines->SetLines(resampledCenterlinesCellArray);
+  resampledCenterlines->GetPointData()->AddArray(resampledCenterlinesRadiusArray);
+  //resampledCenterlines->GetPointData()->AddArray(resampledCenterlinesCentIdArray);
+  //resampledCenterlines->GetPointData()->AddArray(resampledCenterlinesBranchIdArray);
+  //resampledCenterlines->GetPointData()->AddArray(resampledCenterlinesBifurcationIdArray);
+  //resampledCenterlines->GetPointData()->AddArray(resampledCenterlinesNodeIdArray);
+  //resampledCenterlines->GetPointData()->AddArray(resampledCenterlinesNormalArray);
+
+  //std::cout<<resampledCenterlinesPoints->GetNumberOfPoints()<<endl;
+  this->Centerlines->DeepCopy(resampledCenterlines);
+
+  return SV_OK;
+}
 
 int vtkvmtkPolyDataCenterlineSections::CalculateTangent()
 {
@@ -1409,13 +1776,14 @@ int vtkvmtkPolyDataCenterlineSections::RefineCapPoints()
         if (cellIds->GetNumberOfIds() == 1)
             n_cap++;
     }
-
+    //std::cout<<"  counted caps"<<endl;
     // get old arrays
     vtkDoubleArray* radius = vtkDoubleArray::SafeDownCast(polydata->GetPointData()->GetArray(this->RadiusArrayName));
     vtkDoubleArray* normals = vtkDoubleArray::SafeDownCast(polydata->GetPointData()->GetArray(this->CenterlineSectionNormalArrayName));
     vtkIntArray* bifurcation = vtkIntArray::SafeDownCast(polydata->GetPointData()->GetArray(this->BifurcationIdArrayNameTmp));
     vtkIntArray* branch = vtkIntArray::SafeDownCast(polydata->GetPointData()->GetArray(this->BranchIdArrayNameTmp));
     vtkIntArray* centId = vtkIntArray::SafeDownCast(polydata->GetPointData()->GetArray(this->CenterlineIdArrayName));
+    //std::cout<<"  got old arrays"<<endl;
 
     // create new arrays
     vtkNew(vtkDoubleArray, radius_new);
@@ -1424,6 +1792,7 @@ int vtkvmtkPolyDataCenterlineSections::RefineCapPoints()
     vtkNew(vtkIntArray, branch_new);
     vtkNew(vtkIntArray, nodeId_new);
     vtkNew(vtkIntArray, centId_new);
+    //std::cout<<"  created new arrays"<<endl;
 
     radius_new->SetName(this->RadiusArrayName);
     normals_new->SetName(this->CenterlineSectionNormalArrayName);
@@ -1431,6 +1800,7 @@ int vtkvmtkPolyDataCenterlineSections::RefineCapPoints()
     branch_new->SetName(this->BranchIdArrayNameTmp);
     nodeId_new->SetName(this->GlobalNodeIdArrayName);
     centId_new->SetName(this->CenterlineIdArrayName);
+    //std::cout<<"   named new arrays"<<endl;
 
     radius_new->SetNumberOfValues(polydata->GetNumberOfPoints() + n_cap);
     normals_new->SetNumberOfValues(polydata->GetNumberOfPoints() + n_cap);
@@ -1439,6 +1809,7 @@ int vtkvmtkPolyDataCenterlineSections::RefineCapPoints()
     nodeId_new->SetNumberOfValues(polydata->GetNumberOfPoints() + n_cap);
     centId_new->SetNumberOfValues((polydata->GetNumberOfPoints() + n_cap) * this->n_centerlines);
     centId_new->SetNumberOfComponents(this->n_centerlines);
+    //std::cout<<"  set number of values"<<endl;
 
     normals_new->SetNumberOfComponents(3);
 
@@ -1457,6 +1828,7 @@ int vtkvmtkPolyDataCenterlineSections::RefineCapPoints()
     double radius_c, radius_i;
     int sign, i_new, i_cap;
 
+    //std::cout<<"  begin looping over centerlines"<<endl;
     // loop all centerline points
     n_cap = 0;
     for (int i = 0; i < polydata->GetNumberOfPoints(); i++)
@@ -1469,6 +1841,7 @@ int vtkvmtkPolyDataCenterlineSections::RefineCapPoints()
         normals->GetTuple(i, tangent_c);
 
         // cap point: insert new point and cell
+        //std::cout<<" initialized"<<endl;
         if (cellIds->GetNumberOfIds() == 1)
         {
             // select indices depending on if cap is inlet or outlet
@@ -1488,7 +1861,7 @@ int vtkvmtkPolyDataCenterlineSections::RefineCapPoints()
             // get interior point and tangent
             polydata->GetPoint(i - sign, point_i);
             normals->GetTuple(i - sign, tangent_i);
-
+            //std::cout<<"  getting interior point"<<endl;
             // create new point and tangent
             for (int j=0; j<3; j++)
             {
@@ -1507,7 +1880,7 @@ int vtkvmtkPolyDataCenterlineSections::RefineCapPoints()
 
             radius_new->SetValue(i_cap, radius->GetTuple1(i));
             radius_new->SetValue(i_new, 0.5 * (radius->GetTuple1(i) + radius->GetTuple1(i - sign)));
-
+            //std::cout<<"  inserting into array"<<endl;
             // insert new element
             vtkNew(vtkLine, line);
             if (i == 0)
@@ -1523,7 +1896,7 @@ int vtkvmtkPolyDataCenterlineSections::RefineCapPoints()
                 inserted->InsertId(i - 1, i + n_cap);
             }
             lines->InsertNextCell(line);
-
+            //std::cout<<"  instering new element"<<endl;
             // set new arrays
             bifurcation_new->SetValue(i + n_cap, bifurcation->GetValue(i));
             branch_new->SetValue(i + n_cap, branch->GetValue(i));
@@ -1570,7 +1943,16 @@ int vtkvmtkPolyDataCenterlineSections::RefineCapPoints()
     polydata_new->GetPointData()->AddArray(nodeId_new);
     polydata_new->GetPointData()->AddArray(normals_new);
 
+
     polydata->DeepCopy(polydata_new);
+
+    //if (this->Resample){
+    //	std::cout<<" resampling"<<endl;
+    //    if (this->ResampleCenterlines() == SV_ERROR){
+    //        fprintf(stderr,"Resampling failed");
+    //        return SV_ERROR;
+    //    }
+    //}
 
     return SV_OK;
 }

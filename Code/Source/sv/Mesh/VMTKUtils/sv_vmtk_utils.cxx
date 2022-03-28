@@ -106,15 +106,12 @@
  *  @param ntargets number of target cap ids
  *  @param **lines returned center lines as vtkPolyData
  *  @param ** voronoi returned voronoi diagram as vtkPolyData
- *  @param resample flag for centerline resampling
- *  @param resampleStep float for distance between resampled points
  *  @return SV_OK if the VTMK function executes properly
  */
 
 int sys_geom_centerlines( cvPolyData *polydata,int *sources,int nsources,
 		int *targets,int ntargets,
-		cvPolyData **lines, cvPolyData **voronoi, int resample,
-                float resamplingStep)
+		cvPolyData **lines, cvPolyData **voronoi)
 {
   vtkPolyData *geom = polydata->GetVtkPolyData();
   cvPolyData *result1 = NULL;
@@ -151,8 +148,8 @@ int sys_geom_centerlines( cvPolyData *polydata,int *sources,int nsources,
     centerLiner->SetFlipNormals(0);
     centerLiner->SetAppendEndPointsToCenterlines(1);
     centerLiner->SetSimplifyVoronoi(0);
-    centerLiner->SetCenterlineResampling(resample);
-    centerLiner->SetResamplingStepLength(resamplingStep);
+    centerLiner->SetCenterlineResampling(0);
+    centerLiner->SetResamplingStepLength(1);
     centerLiner->Update();
 
     result1 = new cvPolyData( centerLiner->GetOutput() );
@@ -289,7 +286,7 @@ int sys_geom_separatecenterlines( cvPolyData *lines,
  *  @return SV_OK if the VTMK function executes properly
  */
 
-int sys_geom_centerlinesections(cvPolyData *lines_in, cvPolyData *surface_in, cvPolyData **lines_out, cvPolyData **surface_out, cvPolyData **sections)
+int sys_geom_centerlinesections(cvPolyData *lines_in, cvPolyData *surface_in, bool Resample, double ResampleStep, cvPolyData **lines_out, cvPolyData **surface_out, cvPolyData **sections)
 {
   vtkPolyData *cent = lines_in->GetVtkPolyData();
   vtkPolyData *surf = surface_in->GetVtkPolyData();
@@ -304,7 +301,9 @@ int sys_geom_centerlinesections(cvPolyData *lines_in, cvPolyData *surface_in, cv
     std::cout<<"Calculating CenterlineSections..."<<endl;
     cross_sections->SetInputData(surf);
     cross_sections->SetCenterlines(cent);
-    
+    cross_sections->SetResample(Resample);
+    cross_sections->SetResampleStep(ResampleStep);
+
     // for branch/bifurcation splitting
     cross_sections->SetGlobalNodeIdArrayName("GlobalNodeId");
     cross_sections->SetBifurcationIdArrayNameTmp("BifurcationIdTmp");

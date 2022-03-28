@@ -490,7 +490,7 @@ Vmtk_centerlines(PyObject* self, PyObject* args, PyObject* kwargs)
   cvPolyData* voronoiDst = nullptr;
   //std::cout << "[Vmtk_centerlines] Calculate centerlines ... " << std::endl;
 
-  if (sys_geom_centerlines(&cvSurfPolydata, sources.data(), numInletIds, targets.data(), numOutletIds, &linesDst, &voronoiDst, resample, resamplingStep) != SV_OK) {
+  if (sys_geom_centerlines(&cvSurfPolydata, sources.data(), numInletIds, targets.data(), numOutletIds, &linesDst, &voronoiDst) != SV_OK) {
       api.error("Error calculating centerlines.");
       return nullptr;
   }
@@ -505,7 +505,15 @@ Vmtk_centerlines(PyObject* self, PyObject* args, PyObject* kwargs)
       cvPolyData* splitCenterlines = nullptr;
       cvPolyData* surfGrouped = nullptr;
       cvPolyData* sections = nullptr;
-      if (sys_geom_centerlinesections(linesDst, &cvSurfPolydata, &splitCenterlines, &surfGrouped, &sections) != SV_OK) {
+      //if (sys_geom_separatecenterlines(linesDst, &splitCenterlines) != SV_OK){
+      //    api.error("Error splitting centerlines.");
+      //    delete linesDst;
+      //    delete surfGrouped;
+      //    delete sections;
+      //    return nullptr;
+      //}
+  //    std::cout<<resamplingStep<<endl;
+      if (sys_geom_centerlinesections(linesDst, &cvSurfPolydata, resample, resamplingStep, &splitCenterlines, &surfGrouped, &sections) != SV_OK) {
           api.error("Error splitting centerlines.");
           delete linesDst;
           delete surfGrouped;

@@ -91,6 +91,13 @@ class VTK_VMTK_COMPUTATIONAL_GEOMETRY_EXPORT vtkvmtkPolyDataCenterlineSections :
   vtkSetStringMacro(CenterlineIdArrayName);
   vtkGetStringMacro(CenterlineIdArrayName);
 
+  vtkSetMacro(Resample,bool);
+  vtkGetMacro(Resample,bool);
+  //vtkBooleanMacro(Resample,int);
+
+  vtkSetMacro(ResampleStep,double);
+  vtkGetMacro(ResampleStep,double);
+
   protected:
   vtkvmtkPolyDataCenterlineSections();
   ~vtkvmtkPolyDataCenterlineSections();  
@@ -109,6 +116,7 @@ class VTK_VMTK_COMPUTATIONAL_GEOMETRY_EXPORT vtkvmtkPolyDataCenterlineSections :
   int BranchSurface(char* nameBranch, char* nameBifurcation);
   int CalculateTangent();
   int RefineCapPoints();
+  int ResampleCenterlines();
 
   bool IsOnePiece(vtkPolyData* inp);
 
@@ -132,6 +140,9 @@ class VTK_VMTK_COMPUTATIONAL_GEOMETRY_EXPORT vtkvmtkPolyDataCenterlineSections :
   char* CenterlineSectionNormalArrayName;
 
   int n_centerlines;
+
+  bool Resample = false;
+  double ResampleStep = 0.1;
 
   private:
   vtkvmtkPolyDataCenterlineSections(const vtkvmtkPolyDataCenterlineSections&);  // Not implemented.

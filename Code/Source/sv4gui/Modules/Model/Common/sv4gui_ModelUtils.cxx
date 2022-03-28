@@ -1216,7 +1216,9 @@ vtkPolyData* sv4guiModelUtils::CreateCenterlineSections(vtkPolyData* inpd,
     cvPolyData *centerlines=NULL;
     cvPolyData *surf_grouped=NULL;
     cvPolyData *sections=NULL;
-    if ( sys_geom_centerlinesections(tempCenterlines, src, &centerlines, &surf_grouped, &sections) != SV_OK )
+    bool resample = false;
+    double resample_step;
+    if ( sys_geom_centerlinesections(tempCenterlines, src, resample, resample_step, &centerlines, &surf_grouped, &sections) != SV_OK )
     {
         delete src;
         delete centerlines;

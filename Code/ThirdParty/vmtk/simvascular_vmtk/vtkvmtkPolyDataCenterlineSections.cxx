@@ -1047,10 +1047,6 @@ int vtkvmtkPolyDataCenterlineSections::GenerateCleanCenterline()
 {
 
 	// remove duplicate points
-    vtkNew(vtkXMLPolyDataWriter,writer1);
-    writer1->SetFileName("/home/zsexton/Downloads/original_result.vtp");
-    writer1->SetInputDataObject(this->Centerlines);
-    writer1->Update();
     vtkNew(vtkCleanPolyData, cleaner);
     cleaner->SetInputData(this->Centerlines);
     cleaner->PointMergingOn();
@@ -1295,7 +1291,6 @@ int vtkvmtkPolyDataCenterlineSections::GenerateCleanCenterline()
 				resampledCentId->SetComponent(this_id, comp, 0);
 			}
 			resampledCentId->InsertComponent(this_id, c, 1);
-			std::cout<<endl;
 		}
     }
     // If no resampling proceed with original procedure
@@ -1343,11 +1338,6 @@ int vtkvmtkPolyDataCenterlineSections::GenerateCleanCenterline()
     polydata->SetLines(lines);
     polydata->Modified();
 
-    //vtkNew(vtkXMLPolyDataWriter,writer);
-    //writer->SetFileName("/home/zsexton/Downloads/resampled_result.vtp");
-    //writer->SetInputDataObject(polydata);
-    //writer->Update();
-
 
     if (!this->Resample){
          if (polydata->GetNumberOfPoints() != cleaner->GetOutput()->GetNumberOfPoints())
@@ -1383,10 +1373,6 @@ int vtkvmtkPolyDataCenterlineSections::GenerateCleanCenterline()
     else{
     	polydata->GetPointData()->AddArray(centId);
     }
-    vtkNew(vtkXMLPolyDataWriter,writer);
-    writer->SetFileName("/home/zsexton/Downloads/resampled_result.vtp");
-    writer->SetInputDataObject(polydata);
-    writer->Update();
 
     // go through tree and color each branch/bifurcation
     vtkNew(vtkIdList, cellIds);

@@ -1162,7 +1162,6 @@ int vtkvmtkPolyDataCenterlineSections::GenerateCleanCenterline()
 				{
 					// Keep track of points in all previous centerlines
 					pointIds->InsertNextId(i);
-					//pointIdMap->SetId(i,points->GetNumberOfPoints());
 
 					// If a point is a bifurcation point then it must be added
 					double pcoord = 0.0;
@@ -1171,7 +1170,7 @@ int vtkvmtkPolyDataCenterlineSections::GenerateCleanCenterline()
 					// Check if the current point is a bifurcation point
 					// If so then it must be added regardless of resampling step
 					for (int cc=0; cc < this->n_centerlines; cc++){
-						if (cc != c){
+						if (cc != c && (p + 1) < (cell->GetNumberOfPoints()-1)){
 							if (p < centerlines2->GetCell(cc)->GetNumberOfPoints()) {
 								int io = centerlines2->GetCell(cc)->GetPointId(p);
 								int ioo = centerlines2->GetCell(cc)->GetPointId(p+1);
@@ -1206,6 +1205,7 @@ int vtkvmtkPolyDataCenterlineSections::GenerateCleanCenterline()
 					if (length < this->ResampleStep - stepAbscissa){
 						stepAbscissa = stepAbscissa + length;
 						pointIdMap->SetId(i,points->GetNumberOfPoints()-1);
+						pointIdMap->SetId(i,prev_id);
 						continue;
 					}
 					else {
@@ -1266,18 +1266,17 @@ int vtkvmtkPolyDataCenterlineSections::GenerateCleanCenterline()
 						pcoord = pcoord + pcoordStep;
 
 					}
-					pointIdMap->SetId(i,points->GetNumberOfPoints()-1);
+					pointIdMap->SetId(i, prev_id);
 				stepAbscissa = (1.0 - pcoord) * length;
 				}
 				else if ((pointIds->IsId(i) != -1) && (pointIds->IsId(ii) == -1) && (i > 0) && (ii > 0)) {
 					prev_id = pointIdMap->GetId(i);
 					centId->SetComponent(pointIds->IsId(i), c, 1);
-					//resampledCentId->SetComponent(prev_id, c, 1);
+					resampledCentId->SetComponent(prev_id, c, 1);
 				}
 				else {
 					centId->SetComponent(pointIds->IsId(i), c, 1);
 					resampledCentId->SetComponent(pointIdMap->GetId(i), c, 1);
-					//centId->SetComponent(pointIdMap->GetId(i),c,1);
 				}
 			}
 			pointIds->InsertNextId(cell->GetPointId(cell->GetNumberOfPoints()-1));
@@ -1296,6 +1295,7 @@ int vtkvmtkPolyDataCenterlineSections::GenerateCleanCenterline()
 				resampledCentId->SetComponent(this_id, comp, 0);
 			}
 			resampledCentId->InsertComponent(this_id, c, 1);
+			std::cout<<endl;
 		}
     }
     // If no resampling proceed with original procedure
